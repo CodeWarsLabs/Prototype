@@ -1,0 +1,2439 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"/>
+<meta name="color-scheme" content="light"/>
+<title>Globi Adventure — Reading Prototype</title>
+<style>
+@font-face{font-family:"Jua";src:url("assets/jua.woff2") format("woff2");font-weight:400;font-display:swap}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{font-family:"Jua",sans-serif;background:#29A9E8;color:#fff;overflow:hidden;-webkit-tap-highlight-color:transparent;touch-action:manipulation;user-select:none;-webkit-user-select:none}
+button{font-family:inherit;background:none;border:none;cursor:pointer;padding:0}
+img{display:block;max-width:none}
+/* ---------- FULL-BLEED: the design itself fills the whole screen ----------
+   There is NO frame, NO backdrop layer, NO side panel, NO blur
+   wash and NO solid bar anywhere. #app IS the viewport
+   (100vw x 100dvh) and every screen's own background image
+   covers that entire viewport exactly once (object-fit:cover,
+   no repeat). All content inside is positioned and sized in %
+   (and cqw of the full-width stage), so the buyer's own layout —
+   his artwork, colours, text and font, unchanged — simply grows
+   to fill the full width and height on PC, iPad and mobile,
+   edge to edge, with nothing beside it. */
+#app{width:100vw;height:100vh;height:100dvh;display:block;background:transparent;position:relative;overflow:hidden}
+.screen{z-index:1}
+.screen{display:none;width:100%;height:100%;position:absolute;inset:0}
+.screen.active{display:block;animation:scrIn .38s ease-out}
+@keyframes scrIn{from{opacity:0;transform:scale(.985)}to{opacity:1;transform:none}}
+.stage{position:absolute;inset:0;width:100%;height:100%;overflow:hidden;container-type:inline-size;background:transparent}
+.stage>.bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center center}
+.abs{position:absolute}
+.ibtn{position:absolute;line-height:0;transition:transform .08s}
+.ibtn img{width:100%;height:auto}
+.ibtn .prs{display:none}
+.ibtn:active{transform:scale(.96)}
+.ibtn:active .nrm{display:none}
+.ibtn:active .prs{display:block}
+.ibtn.no-pr:active .nrm{display:block}
+@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-1.1%)}}
+.bob{animation:bob 2.6s ease-in-out infinite}
+@keyframes pulseGlow{0%,100%{opacity:.55;transform:scale(1)}50%{opacity:1;transform:scale(1.07)}}
+@keyframes wiggle{0%,100%{transform:rotate(-2deg)}50%{transform:rotate(2deg)}}
+.shake{animation:shk .4s}
+@keyframes shk{0%,100%{transform:translateX(0)}20%{transform:translateX(-1.2%)}40%{transform:translateX(1.2%)}60%{transform:translateX(-.8%)}80%{transform:translateX(.8%)}}
+@keyframes popIn{from{transform:scale(.7);opacity:0}to{transform:scale(1);opacity:1}}
+.pop{animation:popIn .35s cubic-bezier(.2,1.5,.4,1)}
+@keyframes starPop{0%{transform:scale(0) rotate(-50deg)}100%{transform:scale(1) rotate(0)}}
+.jua{font-family:"Jua",sans-serif}
+/* ---------- toast ---------- */
+#toast{position:fixed;left:50%;bottom:3.5%;bottom:3.5dvh;transform:translate(-50%,1.2em);opacity:0;visibility:hidden;background:#0B2A7A;color:#fff;font-size:clamp(13px,2.6vw,30px);padding:.55em 1.2em;border-radius:999px;border:3px solid #fff;box-shadow:0 8px 24px rgba(0,0,0,.4);z-index:99;transition:transform .35s cubic-bezier(.2,1.4,.4,1),opacity .25s,visibility .25s;max-width:92vw;text-align:center;pointer-events:none}
+#toast.on{transform:translate(-50%,0);opacity:1;visibility:visible}
+/* ---------- login ---------- */
+.cell{position:absolute;width:33.4%;cursor:pointer;line-height:0}
+.cell img{width:100%}
+.cell input{position:absolute;inset:8% 6%;width:88%;background:transparent;border:none;outline:none;font-family:"Jua",sans-serif;font-size:4.6cqw;color:#0B2A7A;text-align:center;display:none;caret-color:#0B2A7A}
+.cell.editing input{display:block}
+.cell.missing{animation:cellPulse 1s ease-in-out infinite}
+@keyframes cellPulse{0%,100%{filter:brightness(1)}50%{filter:brightness(1.25) drop-shadow(0 0 12px #FFD93B)}}
+.ackrow{position:absolute;display:flex;align-items:center;gap:1.2%;cursor:pointer;line-height:0}
+.ackrow .chk{position:relative;flex:none;display:inline-block;line-height:0}
+.ackrow .chk img{width:100%}
+.ackrow .chk .tick{position:absolute;left:0;top:0;width:100%;display:none}
+.ackrow.on .chk .tick{display:block}
+.ackrow.pulse{animation:cellPulse 1s ease-in-out infinite;border-radius:2cqw}
+.overlay-full{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:none;z-index:5}
+.overlay-full.on{display:block}
+.popup-wrap{position:absolute;inset:0;display:none;z-index:6}
+.popup-wrap.on{display:block}
+/* ---------- avatar ---------- */
+.tabs{position:absolute;display:flex;gap:.7%;z-index:3}
+.tab{position:relative;flex:1;line-height:0;cursor:pointer;transition:transform .1s}
+.tab img.shape{width:100%}
+.tab img.icon{position:absolute;left:50%;top:46%;transform:translate(-50%,-50%);width:62%}
+.tab.sel{transform:translateY(6%)}
+.panel{position:absolute;border-radius:2.2cqw;padding:2.2cqw 2cqw;z-index:2;display:flex;flex-direction:column}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1.4cqw;flex:1 1 auto;min-height:0}
+.gcell{position:relative;background:url("assets/avatar-cell.png") center/contain no-repeat;cursor:pointer;line-height:0;border-radius:1.6cqw;overflow:hidden;min-width:0;min-height:0}
+.gcell img{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:72%;max-width:94%;max-height:94%}
+.gcell.sel{outline:.55cqw solid #B04DF0;outline-offset:-.2cqw}
+.gcell.selY{outline:.55cqw solid #FFC400;outline-offset:-.2cqw}
+.gcell:active{transform:scale(.95)}
+.eyes-ov{position:absolute;inset:0;display:none;pointer-events:none;z-index:2}
+.eyes-ov.on{display:block}
+.eyes-ov img{position:absolute;height:auto;transform:translate(-50%,-50%)}
+.eyes-ov .sclera-mask{position:absolute;background:#fff;border-radius:50%;transform:translate(-50%,-50%)}
+/* ---------- buyer update 2026-11-20: highlight + blurred circles ---------- */
+.gcell .opt-label{position:absolute;left:50%;bottom:4%;transform:translateX(-50%);font-size:1.55cqw;line-height:1.1;color:#0B2A7A;background:rgba(255,255,255,.92);border-radius:99px;padding:.15em .7em;white-space:nowrap;pointer-events:none}
+.gcell.pickable{box-shadow:0 0 0 .5cqw #FFD93B,0 0 2.6cqw rgba(255,217,59,.95);animation:pickGlow 1.6s ease-in-out infinite}
+@keyframes pickGlow{0%,100%{box-shadow:0 0 0 .45cqw #FFD93B,0 0 1.6cqw rgba(255,217,59,.7)}50%{box-shadow:0 0 0 .65cqw #FFC400,0 0 3.2cqw rgba(255,196,0,1)}}
+.gcell.locked{cursor:not-allowed}
+.gcell.locked .blurcirc{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:62%;aspect-ratio:1;border-radius:50%;background:radial-gradient(circle at 35% 35%,#BFE3FF,#5EA9E6 60%,#2B6CB0);filter:blur(.55cqw);opacity:.75}
+.gcell.locked .locktag{position:absolute;left:50%;bottom:5%;transform:translateX(-50%);font-size:1.5cqw;color:#5B7A99;white-space:nowrap}
+/* Buyer gave NO artwork for these options: the cell stays BLACK/EMPTY. */
+.gcell .blacksw{position:absolute;left:50%;top:42%;transform:translate(-50%,-50%);width:58%;aspect-ratio:1.15;border-radius:1.2cqw;background:#151515}
+/* ---------- avatar option overlays (hair / clothing / shoes / accessories / adventure) ---------- */
+.ovl{position:absolute;pointer-events:none;display:none}
+.ovl.on{display:block}
+.ovl svg{width:100%;height:100%;display:block}
+.ovl img{width:100%;height:auto;display:block}
+/* ---------- celebrate: happy animation on every avatar change ---------- */
+@keyframes celJump{0%{transform:translateY(0) rotate(0)}30%{transform:translateY(-7%) rotate(-2deg)}55%{transform:translateY(0) rotate(2deg)}75%{transform:translateY(-3.5%) rotate(0)}100%{transform:translateY(0)}}
+@keyframes celSpin{0%{transform:rotate(0) scale(1)}40%{transform:rotate(180deg) scale(1.06)}100%{transform:rotate(360deg) scale(1)}}
+@keyframes celWave{0%,100%{transform:rotate(0)}25%{transform:rotate(-5deg)}60%{transform:rotate(5deg)}}
+.cel-jump{animation:celJump .7s ease-in-out}
+.cel-spin{animation:celSpin .75s ease-in-out}
+.cel-wave{animation:celWave .7s ease-in-out}
+.charstage{transform-origin:50% 100%}
+/* ---------- gender Boy/Girl choice (Avatar, next to the character) ----------
+   Same design language as the buyer's tabs and buttons: Jua font,
+   bright filled pills with a white border and the same yellow
+   selection ring the grids use. It sits in the empty gap between
+   the character's feet and the Confirm button — nothing else on
+   the screen moves, shrinks or changes colour. */
+.gender-toggle{position:absolute;display:flex;gap:4%;z-index:5;align-items:stretch}
+.gender-toggle .gbtn{flex:1;font-family:"Jua",sans-serif;font-size:2.7cqw;line-height:1;color:#fff;border:.4cqw solid #fff;border-radius:999px;padding:.55cqw 0 .65cqw;box-shadow:0 .6cqw 0 rgba(11,42,122,.35);cursor:pointer;white-space:nowrap}
+.gender-toggle .gbtn.boy{background:linear-gradient(180deg,#38B6FF,#1293F5)}
+.gender-toggle .gbtn.girl{background:linear-gradient(180deg,#FF8FC7,#F75FA8)}
+.gender-toggle .gbtn.sel{outline:.45cqw solid #FFC400;outline-offset:.15cqw}
+.gender-toggle .gbtn:active{transform:translateY(.4cqw);box-shadow:none}
+/* The Passport Gender pill keeps the buyer's exact pill look and
+   size — it is simply tappable now. Nothing extra sits inside it:
+   just his symbol and the word, like his own image. */
+#ppGenderPill{cursor:pointer}
+#ppGenderPill:active{transform:scale(.96)}
+/* shoe overlay legs (for the character whose own art ends at the dress) */
+.shoe-legs{display:flex;justify-content:center;gap:18%;height:2.6cqw;margin-bottom:-.4cqw}
+.shoe-legs i{display:block;width:16%;border-radius:0 0 1cqw 1cqw;border:.28cqw solid #000;border-top:none}
+/* ---------- home ---------- */
+.hello-name{position:absolute;font-size:3cqw;line-height:1;color:#FFD93B;text-shadow:0 .3cqw 0 rgba(11,42,122,.55);white-space:nowrap;overflow:hidden;text-align:center;z-index:3}
+.africa-hit{position:absolute;cursor:pointer;z-index:4;background:transparent;border-radius:50%}
+/* ---------- lesson ---------- */
+.bubble-css{position:absolute;background:#fff;border:.55cqw solid #0B1E9E;border-radius:3cqw;color:#111;text-align:center;padding:1.6cqw 1.2cqw;font-size:2.9cqw;line-height:1.25;z-index:3}
+.bubble-css:after{content:"";position:absolute;left:16%;bottom:-2.6cqw;width:3.4cqw;height:3.4cqw;background:#fff;border-right:.55cqw solid #0B1E9E;border-bottom:.55cqw solid #0B1E9E;transform:rotate(45deg) skew(12deg,12deg);border-bottom-right-radius:1cqw}
+.hot{position:absolute;background:transparent;cursor:pointer;border-radius:1.4cqw;z-index:4}
+.hot.lit{box-shadow:0 0 0 .6cqw #43C91E,0 0 3cqw rgba(67,201,30,.8);background:rgba(255,255,255,.22)}
+/* ---------- game ---------- */
+#gameView{position:absolute;inset:0;overflow:hidden;touch-action:none}
+#world{position:absolute;top:0;left:0;height:100%;width:200.1%;will-change:transform}
+#world .wbg{position:absolute;inset:0;width:100%;height:100%}
+#world .wplat{position:absolute;inset:0;width:100%;height:100%}
+#player{position:absolute;height:10.75%;width:auto;z-index:6;will-change:transform;filter:drop-shadow(0 .4cqw .4cqw rgba(0,0,0,.25))}
+/* Player height is set as a % of the world HEIGHT (10.75% of 1024 =
+   the 110 world units the physics uses for the character's height),
+   never as a % of the world width. Sizing by width made the drawn
+   character taller than its physics box on wide screens, so its
+   legs sank below the grass. Height-based sizing keeps the drawn
+   feet exactly on the physics feet at every aspect ratio. */
+.pick{position:absolute;z-index:5;will-change:transform}
+.pick .gl{position:absolute;inset:-55%;width:210%;animation:pulseGlow 1.5s ease-in-out infinite}
+.pick img.it{position:absolute;inset:0;width:100%}
+.pick.got{display:none}
+.hud-counter{position:absolute;display:flex;align-items:center;z-index:8;line-height:0}
+.hud-counter .bar{height:100%}
+.hud-counter .num{position:absolute;left:2%;right:19%;top:50%;transform:translateY(-54%);font-size:2.75cqw;line-height:1;text-align:center;white-space:nowrap;color:#fff;text-shadow:0 .3cqw 0 rgba(11,42,122,.6)}
+.hud-counter .ic{height:150%;margin-left:-10%;z-index:2}
+.tctrl{position:absolute;bottom:2.5%;z-index:9;width:9%;aspect-ratio:1;border-radius:50%;background:rgba(255,255,255,.88);border:.5cqw solid #0B2A7A;color:#0B2A7A;font-size:4.6cqw;display:flex;align-items:center;justify-content:center;box-shadow:0 .7cqw 0 rgba(11,42,122,.45)}
+.tctrl.on,.tctrl:active{background:#FFD93B;transform:translateY(.5cqw)}
+.tctrl.jump{width:11%;background:rgba(67,201,30,.92);color:#fff;border-color:#fff;font-size:2.5cqw}
+.pause-panel{position:absolute;z-index:7;background:#FFFEF2;border:1cqw solid #FFC400;border-radius:2.4cqw;text-align:center;padding:3cqw}
+.big-btn{display:inline-block;background:linear-gradient(180deg,#63D61F,#43C91E);color:#fff;border:.45cqw solid #fff;outline:.35cqw solid #2E9E0F;border-radius:1.8cqw;padding:.7cqw 3.4cqw;font-size:3.4cqw;cursor:pointer;box-shadow:0 .8cqw 0 rgba(0,0,0,.22)}
+.big-btn:active{transform:translateY(.5cqw);box-shadow:none}
+.big-btn.blue{background:linear-gradient(180deg,#38B6FF,#1293F5);outline-color:#0B6FC4}
+.big-btn.orange{background:linear-gradient(180deg,#FFB03A,#FF8A00);outline-color:#D96C00}
+/* skill check */
+.sc-wrap{position:absolute;inset:0;display:none;z-index:20}
+.sc-wrap.on{display:block}
+.sc-board{position:absolute;left:19%;top:21%;width:62%}
+.sc-board>img{width:100%}
+.sc-pic-cover{position:absolute;background:#FFFEF2;border-radius:1cqw;display:none}
+.sc-pic{position:absolute;display:none;object-fit:contain}
+.sc-cellwrap{position:absolute;line-height:0}
+.sc-cellwrap img{width:100%}
+.sc-cellwrap .word-txt{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:5.2cqw;color:#fff;letter-spacing:.6cqw;text-shadow:0 .3cqw 0 rgba(0,0,0,.12)}
+.vowel-row{position:absolute;display:flex;gap:1.6%;z-index:21}
+.vowel-row .ibtn{position:static;width:9.5%}
+.mic-listen{animation:pulseGlow .7s ease-in-out infinite}
+/* reward — the buyer's "You Did It!" party design: pale party
+   room with bunting, his speech bubble and the party character
+   on the left, the dark purple panel with 3 stars and the three
+   blue buttons on the right, balloons at the bottom right.
+   The bubble and the character sit FULLY inside the stage with
+   clear margins on every side — in the buyer's own mockup
+   screenshot they ran off the left edge (the bubble text was
+   cut mid-word and the character was half off-screen); here
+   nothing is cut at any edge. */
+.party-bg{position:absolute;inset:0;background:linear-gradient(180deg,#CDEFFB 0%,#CDEFFB 78%,#E4DCFA 78.2%,#D9CFF7 100%)}
+.party-bunting{position:absolute;left:0;top:0;width:100%;z-index:1;pointer-events:none}
+.party-bubble{position:absolute;left:3.5%;top:5.5%;width:29%;background:#fff;border:.45cqw solid #2B3A8F;border-radius:2.4cqw;color:#222;padding:1.5cqw 1.8cqw;font-size:2.75cqw;line-height:1.3;z-index:3}
+.party-bubble:after{content:"";position:absolute;left:18%;bottom:-2.2cqw;width:2.8cqw;height:2.8cqw;background:#fff;border-right:.45cqw solid #2B3A8F;border-bottom:.45cqw solid #2B3A8F;transform:rotate(45deg) skew(12deg,12deg);border-bottom-right-radius:.8cqw}
+.party-char{position:absolute;left:2.8%;bottom:2.5%;width:16.5%;z-index:3;pointer-events:none}
+.party-balloons{position:absolute;right:1.5%;bottom:1.2%;width:12%;z-index:6;pointer-events:none}
+.reward-panel{position:absolute;left:63%;top:50%;transform:translate(-50%,-50%);width:56%;background:linear-gradient(180deg,#3A2680,#26155C);border:.55cqw solid #6A55C9;border-radius:2.6cqw;text-align:center;padding:2.6cqw 3cqw 3cqw;z-index:5;color:#fff;box-shadow:0 1.2cqw 3cqw rgba(38,21,92,.35)}
+.reward-panel h2{color:#fff;font-size:6cqw;line-height:1}
+.reward-panel .big-btn{display:block;margin:0 auto;min-width:64%;background:linear-gradient(180deg,#4A9BE0,#2B6FD6);outline-color:#1D4FA1}
+.big-stars{display:flex;justify-content:center;gap:2.4cqw;margin:1.6cqw 0 .6cqw}
+.big-stars img{width:9.5cqw;animation:starPop .55s cubic-bezier(.2,1.8,.4,1) backwards}
+.big-stars img:nth-child(2){animation-delay:.18s}.big-stars img:nth-child(3){animation-delay:.36s}
+.totals{display:flex;justify-content:center;gap:4cqw;margin:1cqw 0 1.6cqw;font-size:3.6cqw}
+.totals span{display:flex;align-items:center;gap:.8cqw}
+.totals img{height:4.6cqw;width:auto}
+.fall{position:absolute;top:-8%;z-index:4;pointer-events:none;animation:fall linear forwards}
+@keyframes fall{to{transform:translateY(115cqw) rotate(320deg)}}
+/* ---------- passport (opened from the yellow profile button) ----------
+   The page is built FROM the buyer's passport image (A5DCCB59)
+   itself — see the .pp-wrap note below. */
+.pp-sky{background:linear-gradient(180deg,#1FA2E8 0%,#3FB9F2 45%,#7ED0FA 100%)}
+/* The passport page IS the buyer's own passport image
+   (assets/passport-book.webp, cropped from his A5DCCB59 image):
+   his sky-blue strip with clouds, flags and the aeroplane on top,
+   the open book with its blue border and cream pages, GLOBI
+   PASSPORT in his own font, the purple labels and white pills,
+   the red crown seal, the WORLD TRAVELER and GLOBI stamps in his
+   exact shapes, colours and positions, "Dream • Learn • Explore"
+   and the barcode — every one of those pixels is his artwork, so
+   the font, the seal (mohor) and the stamps match his image
+   exactly by construction; nothing is redrawn in a different
+   font or a different seal. Only the LIVE parts are overlaid on
+   top of his image: the child's own Globatar (full body, head to
+   shoes) inside his blue photo box, the live Name and Gender
+   inside his white pills, the 7 tab hit-areas, and the tab
+   grids. The grids sit on ONE clean opaque panel (see
+   #ppGridPanel below) that covers the eye grid baked into his
+   image, so every tab shows only its own live cells — drawn
+   from his own artwork files — with the live purple ring on
+   the picked one, and no baked eye cell can ever peek through
+   behind another tab's grid. (The one exception to "his
+   pixels": the purple ring his artwork had baked around the
+   green eye has been painted out, so green no longer looks
+   selected when another eye is picked.) */
+/* The passport book keeps its own 900/648 shape (it is the buyer's
+   image, never distorted) but grows to fill the screen: as wide as
+   the viewport allows, and on wide screens as tall as the viewport
+   allows — width capped at 133.3dvh so its height never passes
+   96dvh. The buyer's sky gradient fills the rest of the screen. */
+.pp-wrap{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(98%,133.3vh);width:min(98%,133.3dvh);aspect-ratio:900/648;z-index:2;filter:drop-shadow(0 1.2cqw 2.4cqw rgba(2,48,96,.35))}
+.pp-art{position:absolute;inset:0;width:100%;height:100%}
+.pp-photo{position:absolute;left:7.44%;top:26.39%;width:23.67%;height:35.34%;background:linear-gradient(180deg,#37B8F2,#1EA7EC);border-radius:1.3cqw;overflow:hidden;z-index:2}
+.pp-photo .pp-plane{position:absolute;right:5%;top:4%;width:20%;opacity:.3;z-index:1}
+#passportStage{position:absolute;left:8%;top:1%;width:84%;z-index:2}
+.pp-pillO{position:absolute;background:#fff;border-radius:1.2cqw;box-shadow:0 .3cqw .9cqw rgba(120,90,0,.16);display:flex;align-items:center;color:#14346B;z-index:3;white-space:nowrap;overflow:hidden}
+#ppNamePill{left:32.67%;top:30.70%;width:16.44%;height:6.64%;justify-content:center;font-size:2.5cqw;padding:0 1cqw}
+#ppName{overflow:hidden;text-overflow:ellipsis}
+/* Passport overlay alignment, re-measured pixel-by-pixel off the
+   buyer's own passport image (900x648): ALL five of his pills —
+   Name, Status, Gender, Passport No. and Nationality — share
+   ONE size: outer bounds x 294-441 (148px wide), 43px tall,
+   with his slight rounded-rectangle corners (not full pill
+   ends). Name spans y 193-235, Gender y 330-373. The live Name
+   and Gender pills keep that exact width, height, padding and
+   font size — same as his Status / Passport No. / Nationality
+   pills, which stay as his artwork — but sit a few pixels
+   LOWER than his drawn pill tops: at y 199 and y 334. Sitting
+   on his exact tops (193 / 330) put the live pills' top edges
+   and shadows right against the "Name:" label (his purple
+   label pixels end at y 190) and the "Gender:" label (ends
+   y 329), so the labels' bottoms looked covered. At 199 / 334
+   each label is fully visible with a small clean gap above
+   its pill — the same breathing room his own image has — and
+   the pill bottoms (242 / 377) still clear the next labels
+   below ("Status:" starts y 249, "Passport No.:" y 379).
+   Nothing else about the pills changed: same size, same
+   white, same text. (The still older live pills spanned
+   x 281-449 (168px): 13px too far left, into his blue photo
+   box (x 67-280), and 8px too far right, which is why they
+   looked bigger than every other box on the page.) */
+#ppGenderPill{left:32.67%;top:51.55%;width:16.44%;height:6.64%;padding-left:1cqw;gap:.6cqw;font-size:2.5cqw}
+.pp-gender-sym{color:#1293F5;font-size:2.6cqw;line-height:1}
+/* His tab row spans x 463-845 with edges at 463/512/564/614/
+   662/728/782/845 — the tabs are NOT equal widths in his drawing
+   (49/52/50/48/66/54/63 px; the purple Eyes tab is the wide,
+   raised one, its top at y 60, the row's bottom at y 131). The
+   overlay follows his exact tab edges (flex shares match his
+   widths, no gaps), so the yellow ring sits inside the Eyes tab
+   itself, never across its two eye icons. */
+.pp-tabsO{position:absolute;left:51.44%;top:8.95%;width:42.44%;height:11.27%;display:flex;gap:0;z-index:3}
+.pp-tab{flex:1;background:transparent;border-radius:1cqw;cursor:pointer;padding:0}
+.pp-tabsO .pp-tab:nth-child(1){flex:49 1 0}
+.pp-tabsO .pp-tab:nth-child(2){flex:52 1 0}
+.pp-tabsO .pp-tab:nth-child(3){flex:50 1 0}
+.pp-tabsO .pp-tab:nth-child(4){flex:48 1 0}
+.pp-tabsO .pp-tab:nth-child(5){flex:66 1 0}
+.pp-tabsO .pp-tab:nth-child(6){flex:54 1 0}
+.pp-tabsO .pp-tab:nth-child(7){flex:63 1 0}
+.pp-tab.sel{box-shadow:inset 0 0 0 .45cqw #FFD93B,0 0 1.8cqw rgba(255,217,59,.85)}
+/* His eye-colour cells span x 480-834 (75px cells, 18px gaps)
+   and rows y 152-224 / 244-318 / 339-411 (73px rows, 20px
+   gaps) — the live grid sits in that exact place, on the
+   clean panel below, and the live selection ring is drawn
+   around the cell box, so exactly one clean ring shows, in
+   its own box, on whichever cell is picked.
+   NOTE: his artwork itself had a purple ring BAKED around the
+   green eye (top row, 4th cell), so green looked selected
+   forever and two rings showed whenever another eye was
+   picked. That baked ring has been painted out of
+   passport-book.webp (repainted with the neighbouring
+   un-ringed cell's own cyan/cream pixels; every other pixel
+   of his image is untouched) — the artwork now has NO ring
+   on any cell, and the only ring is the live one below. */
+/* Clean panel behind the Passport grid — the SAME panel the
+   Avatar screen uses (the tab's own pale panel colour with its
+   coloured border, like the Avatar character grid). It is fully
+   OPAQUE and covers the whole baked eye-grid area of the
+   buyer's passport image (cells x 480-834, y 152-411, plus a
+   small margin), so on EVERY tab the only thing behind the
+   cells is this panel: the eye grid baked into his image can
+   never peek through the gaps between cells, below a shorter
+   grid (character 2x2, hair / accessories / adventure 4x2) or
+   around the makeup note. Each tab shows ONLY its own cells
+   on this panel, nothing else. */
+#ppGridPanel{position:absolute;left:52.3%;top:22.1%;width:41.4%;height:42.7%;background:#F7F0FE;border:.45cqw solid #B04DF0;border-radius:1.6cqw;z-index:2}
+#ppEyeGrid{position:absolute;left:53.33%;top:23.46%;width:39.33%;height:39.97%;display:grid;grid-template-columns:repeat(4,1fr);gap:7.9% 5.1%;z-index:3}
+.pp-eye{position:relative;background:transparent;border-radius:1.2cqw;cursor:pointer;line-height:0;padding:0;overflow:visible}
+.pp-eye.vis{background:linear-gradient(180deg,#C9F2F7,#A9E4EE);overflow:hidden}
+.pp-eye img{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:64%}
+.pp-eye.sel{box-shadow:0 0 0 .5cqw #B04DF0}
+.pp-eye:active{transform:scale(.95)}
+/* ---------- PDF items added 2026-11-21 (buyer's PDF spec) ----------
+   Everything below uses ONLY the buyer's own artwork, colours and
+   Jua font — no new artwork, no new colours, no layout change to
+   any existing screen. */
+/* (1) Welcome screen: GLOBI logo + brief intro + Join button */
+.globi-logo{position:absolute;left:0;right:0;top:7%;text-align:center;font-size:14.5cqw;line-height:1;letter-spacing:.5cqw;z-index:3;text-shadow:0 .45cqw 0 #fff,0 1cqw 0 rgba(11,42,122,.35)}
+.globi-logo .lg-g{color:#43C91E}.globi-logo .lg-l{color:#FF8A00}.globi-logo .lg-o{color:#1293F5}.globi-logo .lg-b{color:#F75FA8}.globi-logo .lg-i{color:#B04DF0}
+.welcome-tag{position:absolute;left:0;right:0;top:26.5%;text-align:center;font-size:3.6cqw;color:#0B2A7A;z-index:3;text-shadow:0 .25cqw 0 #fff}
+.welcome-intro{position:absolute;left:16%;right:16%;top:35%;text-align:center;font-size:3.1cqw;line-height:1.35;color:#0B2A7A;background:rgba(255,255,255,.88);border:.5cqw solid #0B1E9E;border-radius:2.6cqw;padding:1.8cqw 2.4cqw;z-index:3}
+.welcome-start{position:absolute;left:50%;transform:translateX(-50%);bottom:9%;font-size:4.6cqw;padding:1.1cqw 4.6cqw;z-index:4;white-space:nowrap}
+.welcome-start:active{transform:translateX(-50%) translateY(.5cqw)}
+/* (2) Home: labeled continents, Africa bold + highlighted, rest locked */
+/* The chips sit in their OWN band above the bottom buttons. The
+   button row's height is set by the button IMAGES (9.43cqw tall,
+   bottom:2.8%) and the icon badges reach 2.6cqw higher still, so
+   anchoring the chips with a plain % bottom let the second row
+   sink onto the buttons on wide screens. The bottom offset below
+   is therefore measured in cqw from the buttons themselves —
+   12.6cqw + 3.6% always clears the badge tops (12.03cqw + 2.8%)
+   with a clean gap at every aspect ratio, and the two wrapped
+   rows end well below the speech bubble. */
+.cont-chips{position:absolute;left:24%;right:2.5%;bottom:calc(12.6cqw + 3.6%);display:flex;flex-wrap:wrap;gap:.8cqw;justify-content:center;z-index:5}
+.cont-chip{font-family:"Jua",sans-serif;font-size:1.95cqw;line-height:1;color:#fff;background:rgba(11,42,122,.72);border:.32cqw solid rgba(255,255,255,.85);border-radius:999px;padding:.4cqw 1.25cqw;cursor:pointer;white-space:nowrap}
+.cont-chip.africa{background:#FFC400;color:#0B2A7A;border-color:#fff;font-size:2.5cqw;box-shadow:0 0 0 .35cqw #43C91E,0 0 2.4cqw rgba(255,196,0,.9)}
+.cont-chip.hl{background:#43C91E;color:#fff;border-color:#FFD93B}
+.cont-chip:active{transform:scale(.95)}
+/* globe spin (drag the globe, or it spins when a locked chip is tapped) */
+@keyframes globeSpin{0%{transform:rotate(0) scale(1)}30%{transform:rotate(140deg) scale(1.06)}65%{transform:rotate(270deg) scale(1.06)}100%{transform:rotate(360deg) scale(1)}}
+.spinning{animation:globeSpin 2.3s ease-in-out}
+/* the child's own Globatar in the corner of Home */
+#homeStage{cursor:pointer}
+/* (4) Kenya video-style intro overlay (buyer's savanna art, panning) */
+.kenya-intro{position:absolute;inset:0;z-index:8;display:none;overflow:hidden}
+.kenya-intro.on{display:block}
+.kenya-intro .kipan{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;animation:kiPan 16s ease-in-out infinite alternate}
+@keyframes kiPan{from{transform:scale(1.02) translateX(0)}to{transform:scale(1.16) translateX(-3.5%)}}
+.kenya-intro .ki-title{position:absolute;left:36.5%;top:4.2%;width:27%;z-index:2}
+.ki-card{position:absolute;left:50%;top:56%;transform:translateX(-50%);width:62%;background:#FFFEF2;border:.8cqw solid #FFC400;border-radius:2.4cqw;color:#0B2A7A;text-align:center;font-size:3.6cqw;line-height:1.3;padding:2.2cqw 2.6cqw;z-index:2;box-shadow:0 1cqw 2.4cqw rgba(2,48,96,.3)}
+.ki-dots{position:absolute;left:50%;bottom:16%;transform:translateX(-50%);display:flex;gap:1.2cqw;z-index:2}
+.ki-dots i{width:1.7cqw;height:1.7cqw;border-radius:50%;background:rgba(255,255,255,.65);border:.3cqw solid #0B2A7A;display:block}
+.ki-dots i.on{background:#FFC400}
+.ki-skip{position:absolute;right:4%;bottom:4%;z-index:3}
+.ki-go{position:absolute;left:50%;transform:translateX(-50%);bottom:4%;z-index:3;display:none}
+.ki-go.on{display:inline-block}
+/* (5) lesson walk-in */
+.walk-bob{animation:walkBob .32s ease-in-out 5}
+@keyframes walkBob{0%,100%{margin-bottom:0}50%{margin-bottom:1.2cqw}}
+.hot.done{box-shadow:0 0 0 .6cqw #43C91E,0 0 3cqw rgba(67,201,30,.9);background:rgba(67,201,30,.25)}
+.hot.wrong{animation:shk .4s}
+#btnLessonPlay.pulse{animation:pickGlow 1.2s ease-in-out infinite;border-radius:2cqw}
+/* Lesson Play button: anchored to the BOARD, not the screen
+   bottom. The board's bottom edge sits at top 22.3% + 37.63cqw
+   (62.2% wide x 0.605 aspect); the button's top is set 2% of the
+   stage height below that edge, so the gap is the same at every
+   aspect ratio and it can never touch or overlap the board the
+   way the old bottom-anchored 26%-wide button did on wide
+   screens. On very wide screens the board reaches ~89% of the
+   stage height, so the button shrinks to fit the strip below it. */
+@media (min-aspect-ratio: 17/10){
+  #btnLessonPlay{width:11.5%!important;right:6%!important;top:calc(23.3% + 37.63cqw)!important}
+}
+/* (6) game: letter pickups + the lower valley the camera follows down to */
+#gameView{background:linear-gradient(180deg,#7ED0FA 0%,#CDEFA0 52%,#57B93C 100%)}
+.pick .lt{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:2.1cqw;color:#0B2A7A;text-shadow:0 .2cqw 0 #fff;z-index:2}
+/* (8) World Map page (PDF §4 "What I want to add"): a SECOND
+   screen after the globe Home — a framed FLAT map of the world
+   with every continent labeled, Africa bolded and highlighted,
+   the rest locked, tabs along the top and the child's own
+   Globatar in a profile card at the top right. GLOBI branding
+   only; the layout follows the buyer's reference, the artwork,
+   colours and font are the prototype's own. */
+.map-sky{background:linear-gradient(180deg,#79CEF5 0%,#BDEBFA 55%,#F6D98A 100%)}
+.map-tabs{position:absolute;left:17%;top:3.4%;width:48%;display:flex;gap:2.5%;z-index:5}
+.map-tab{position:relative;flex:1;font-family:"Jua",sans-serif;border-radius:1.4cqw;padding:1.05cqw 0;color:#fff;font-size:2.2cqw;line-height:1;text-align:center;border:.35cqw solid rgba(255,255,255,.85);box-shadow:0 .5cqw 0 rgba(11,42,122,.3);cursor:pointer}
+.map-tab:active{transform:translateY(.4cqw);box-shadow:none}
+.map-tab.q{background:linear-gradient(180deg,#63D61F,#43C91E)}
+.map-tab.v{background:linear-gradient(180deg,#FF7A95,#F0547A)}
+.map-tab.b{background:linear-gradient(180deg,#FFB03A,#FF8A00)}
+.map-tab.s{background:linear-gradient(180deg,#FF8FC7,#F75FA8)}
+.map-tab.g{background:linear-gradient(180deg,#A678E8,#8B5FC7)}
+.map-profile{position:absolute;right:2.5%;top:2.2%;width:19.5%;background:#FFF7E6;border:.5cqw solid #E8910F;border-radius:1.8cqw;z-index:5;display:flex;align-items:center;gap:6%;padding:.9cqw 1.1cqw;color:#0B2A7A;box-shadow:0 .8cqw 1.8cqw rgba(2,48,96,.25)}
+.map-profile .pname{font-size:2.35cqw;line-height:1.05;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.map-profile .pstars{display:flex;align-items:center;gap:.5cqw;font-size:2.1cqw;margin-top:.4cqw}
+.map-profile .pstars img{height:2.5cqw;width:auto}
+.map-frame{position:absolute;left:4%;top:15.5%;width:92%;aspect-ratio:1200/740;border:2cqw solid #C97B2D;border-radius:1.8cqw;background:linear-gradient(180deg,#3FB9F2,#1D8FE0);box-shadow:inset 0 0 0 .7cqw #8A4E12,0 1.2cqw 2.6cqw rgba(2,48,96,.35);z-index:2}
+.map-frame>svg{position:absolute;inset:0;width:100%;height:100%}
+.map-title{position:absolute;left:50%;top:-3.1cqw;transform:translateX(-50%);background:linear-gradient(180deg,#F2B544,#DE8F26);border:.5cqw solid #8A4E12;border-radius:1.6cqw;padding:.55cqw 3.2cqw;font-size:3.5cqw;line-height:1;letter-spacing:.3cqw;color:#1293F5;-webkit-text-stroke:.16cqw #fff;white-space:nowrap;z-index:3;box-shadow:0 .6cqw 1.4cqw rgba(2,48,96,.3)}
+.map-hit{position:absolute;background:transparent;cursor:pointer;border-radius:2cqw;z-index:4}
+.map-hit:active{background:rgba(255,255,255,.18)}
+.map-lbl{font-family:"Jua",sans-serif;fill:#fff;stroke:rgba(11,42,122,.45);stroke-width:4;paint-order:stroke;letter-spacing:.06em}
+.map-lbl-dark{fill:#0B2A7A;stroke:rgba(255,255,255,.6)}
+@keyframes mapGlow{0%,100%{filter:drop-shadow(0 0 5px rgba(255,196,0,.85))}50%{filter:drop-shadow(0 0 16px rgba(255,196,0,1))}}
+.map-africa-shape{animation:mapGlow 1.8s ease-in-out infinite;cursor:pointer}
+#btnWorldMap:active{transform:translateX(-50%) translateY(.5cqw)}
+/* (7) skill check: stars / gems earned so far */
+.sc-totals{position:absolute;left:50%;top:8.5%;transform:translateX(-50%);display:flex;align-items:center;gap:1.4cqw;background:rgba(11,42,122,.88);border:.4cqw solid #fff;border-radius:999px;padding:.7cqw 2.2cqw;font-size:2.9cqw;color:#fff;z-index:22;white-space:nowrap}
+.sc-totals img{height:3.6cqw;width:auto}
+
+/* Full-bleed at every size: portrait and landscape use the same
+   % layout — every screen's background covers the whole viewport
+   and the content spreads edge to edge with nothing beside it. */
+/* ---------- NARROW / PORTRAIT SCREENS (phone portrait, iPad
+   portrait, Surface portrait — any viewport narrower than the
+   design's own 1600x1199 shape) ----------
+   The buyer's artwork is a 4:3 landscape design. Stretching that
+   layout over a tall portrait viewport by % of HEIGHT is what
+   broke it: the Name/Age/School boxes drifted far apart (their
+   tops are % of the tall height), and the log-in character —
+   sized by % of the tall height — grew wider than the screen and
+   was cut off at the edge.
+   Fix, with ZERO design change (same artwork, colours, text,
+   font and relative positions): the stage becomes the design
+   canvas itself — full viewport WIDTH, the design's exact
+   1600/1199 aspect, centred vertically. Inside it every % and
+   cqw is once again measured against the design's own shape, so
+   the character stands fully visible head to shoes, the form
+   boxes stay grouped exactly as drawn, and every button, tab
+   and hit-area sits exactly on its artwork and stays tappable,
+   on every screen (Log-in, Avatar, Home, Africa, Lesson, Game,
+   Skill Check, Reward, Passport).
+   The area above and below the canvas is NOT a bar, a frame or
+   a new colour: the screen's own background artwork fills the
+   whole viewport behind the canvas (cover, centred), so the
+   design's background runs edge to edge over the entire screen
+   with no grey or dark side anywhere and no second screen image
+   showing through. Landscape screens (PC, iPad landscape) are
+   untouched and keep the full-bleed layout above. */
+@media (max-aspect-ratio: 133/100){
+  .stage{left:0;right:0;top:50%;bottom:auto;width:100%;height:auto;aspect-ratio:1600/1199;transform:translateY(-50%)}
+  #s-welcome{background:#29A9E8 url("assets/bg-login.webp") center/cover no-repeat}
+  #s-login{background:#29A9E8 url("assets/bg-login.webp") center/cover no-repeat}
+  #s-avatar{background:#29A9E8 url("assets/bg-avatar.webp") center/cover no-repeat}
+  #s-home{background:#29A9E8 url("assets/bg-home.webp") center/cover no-repeat}
+  #s-map{background:linear-gradient(180deg,#79CEF5,#F6D98A)}
+  #s-africa{background:#29A9E8 url("assets/bg-africa.webp") center/cover no-repeat}
+  #s-lesson{background:#29A9E8 url("assets/bg-lesson.webp") center/cover no-repeat}
+  #s-game{background:#29A9E8 url("assets/bg-game.webp") center/cover no-repeat}
+  #s-reward{background:#CDEFFB}
+  #s-passport{background:linear-gradient(180deg,#1FA2E8 0%,#3FB9F2 45%,#7ED0FA 100%)}
+}
+@media (prefers-reduced-motion: reduce){*,*:before,*:after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
+</style>
+</head>
+<body>
+<!-- Screen-reader summary: every screen of this prototype is the
+     buyer's artwork, so the game's text lives in the images. This
+     visually-hidden block gives assistive technology the same
+     information in real text. -->
+<div class="sr-only" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap">
+  <h1>Globi Adventure — Reading Prototype</h1>
+  <p>The Welcome screen shows the GLOBI logo, a short introduction and the Join the Globi Adventure button. Then sign in with your name, age and school, tap Acknowledgment and OK, then make your Globatar: choose a character, skin and eyes, and tap Confirm. Every character keeps its own original outfit and original shoes, exactly as drawn.</p>
+  <p>On the world screen, all seven continents are labeled: Africa is highlighted as the first destination and the others — Asia, Europe, North America, South America, Australia and Antarctica — are locked. Drag the globe sideways to spin it through the continent names. Your own Globatar stands in the top corner. The Avatar, Books, Games and Snap Words buttons are the buyer's clean coloured buttons with their words fully visible and nothing on top of them.</p>
+  <p>The World Map button — or tapping Africa on the globe — opens the flat Map of the World: a framed map with all seven continents labeled (North America, South America, Europe, Africa, Asia and Oceania, Australia and Antarctica), Africa highlighted with a star, the others locked with number pins, Quest, Videos, Books, Songs and Games tabs along the top, and your own Globatar in a profile card in the top-right corner. Tap Africa on the map to explore it.</p>
+  <p>Click on Africa, then click on Kenya: a short animated introduction plays with facts about Mount Kenya, elephants and lions, Lake Victoria and Nairobi. Then your safari friend walks into the scene and the phonics lesson plays: hear each CVC word — cat, bus, mud, fan, pig and top — sounded out, then tap the word you are asked for; right and wrong answers get instant feedback. Tap Play to start Level 1.</p>
+  <p>In Level 1 you can also drop down into a lower valley — the screen follows you down — and collect letter stars that say their letter sounds. In the Skill Check, the stars and gems you earned are shown at the top, and the microphone button records your voice saying the word and plays it back to you. The level-completed screen shows your total stars and gems, with Next Level, Menu and Play Again buttons.</p>
+  <p>On the Avatar screen, the Boy and Girl buttons next to your Globatar choose your gender. The yellow profile button at the top right of the world screen opens your Globi Passport: it shows your Globatar photo, your name, your status as a Globi Jr., your gender — tap the gender pill to switch between Boy and Girl, and the Avatar screen changes too — passport number GLOBI-001 and Globian nationality, and your eye colours. Tap Back to return to the world screen.</p>
+  <p>In the game, use the left and right arrows (or the Arrow keys) to walk and the JUMP button (or Space) to jump. Collect all 15 stars and all 5 superpower gems. At the bamboo ladder, tap and hold the ladder itself to climb up to the top platform — hold the lower part of the ladder to climb back down — or swipe up or down on the screen while at the ladder (on a keyboard, hold Arrow Up / W to climb up and Arrow Down / S to climb down). When every star and gem is collected, the Skill Check opens: tap the missing vowel letter to complete each word.</p>
+</div>
+<div id="app">
+
+<!-- ================= 0. WELCOME (PDF §2) =================
+     GLOBI logo, a brief introduction to the platform and the
+     "Join the Globi Adventure" (Start Adventure) button — all
+     three are required by the buyer's PDF before the sign-in
+     screen. Built only from his own log-in sky, his log-in
+     character and his colours/font; the button leads into his
+     Acknowledgment screen exactly as before. -->
+<section class="screen active" id="s-welcome">
+  <div class="stage">
+    <img class="bg" src="assets/bg-login.webp" alt="">
+    <div class="globi-logo" aria-label="GLOBI"><span class="lg-g">G</span><span class="lg-l">L</span><span class="lg-o">O</span><span class="lg-b">B</span><span class="lg-i">I</span></div>
+    <div class="welcome-tag">Dream &bull; Learn &bull; Explore</div>
+    <p class="welcome-intro">Welcome to Globi! Travel around the world, make your own Globatar, and learn to read with phonics games, songs and adventures in every country!</p>
+    <img class="abs bob" src="assets/login-char.png" alt="Globi friend with an orange bow" style="right:4%;top:30%;height:34%;width:auto;z-index:2">
+    <button class="big-btn welcome-start" id="btnStart">Join the Globi Adventure</button>
+  </div>
+</section>
+
+<!-- ================= 1. LOG-IN / WELCOME ================= -->
+<section class="screen" id="s-login">
+  <div class="stage">
+    <img class="bg" src="assets/bg-login.webp" alt="">
+    <img class="abs bob" src="assets/login-bubble.png" alt="Welcome!" style="left:12.5%;top:4.5%;width:34.5%">
+    <!-- Full body, head to shoes: login-char.png now includes her legs
+         and brown boots below the yellow dress (the buyer's original
+         crop ended at the dress, so she looked legless). She stands
+         fully ABOVE the Name box — bottom 38.3% vs Name top 39.2% —
+         so no part of her is hidden behind a form box, the Welcome
+         bubble or the screen edge. The old login-fingers overlay
+         (a peeking grip hand for the behind-the-box pose) is gone. -->
+    <img class="abs" src="assets/login-char.png" alt="Globi friend with an orange bow, yellow dress, legs and shoes" style="left:55%;top:0.8%;height:37.5%;width:auto">
+    <div class="cell" data-field="name" style="left:33.3%;top:39.2%">
+      <img class="lbl" src="assets/cell-name.png" alt="Name">
+      <img class="emp" src="assets/cell-empty.png" alt="" style="display:none">
+      <input id="in-name" type="text" autocomplete="off" maxlength="16" aria-label="Name">
+    </div>
+    <div class="cell" data-field="age" style="left:33.3%;top:52.7%">
+      <img class="lbl" src="assets/cell-age.png" alt="Age">
+      <img class="emp" src="assets/cell-empty.png" alt="" style="display:none">
+      <input id="in-age" type="text" inputmode="numeric" autocomplete="off" maxlength="2" aria-label="Age">
+    </div>
+    <div class="cell" data-field="school" style="left:33.3%;top:66.2%">
+      <img class="lbl" src="assets/cell-school.png" alt="School">
+      <img class="emp" src="assets/cell-empty.png" alt="" style="display:none">
+      <input id="in-school" type="text" autocomplete="off" maxlength="24" aria-label="School">
+    </div>
+    <div class="ackrow" id="ackRow" style="left:24.5%;top:86.5%">
+      <span class="chk" style="width:6.2cqw">
+        <img src="assets/check-cell.png" alt="" style="width:100%">
+        <img class="tick" src="assets/check.png" alt="">
+      </span>
+      <img src="assets/ack-text.png" alt="Acknowledgment" style="width:39.5cqw">
+      <img src="assets/info.png" alt="Information" style="width:2cqw;align-self:flex-start">
+    </div>
+    <div class="popup-wrap" id="ackPopup">
+      <div class="abs pop" style="left:20.4%;top:21.5%;width:59.2%">
+        <img src="assets/login-popup.webp" alt="Acknowledgment: By using this application, you agree that all user data will be stored securely and used only for educational and personalization purposes. This app is designed for children and follows appropriate safety guidelines. Parental supervision is recommended for younger users. No personal information will be shared with third parties." style="width:100%">
+        <button class="ibtn" id="ackOk" style="left:50%;transform:translateX(-50%);bottom:9%;width:37%" aria-label="OK">
+          <img class="nrm" src="assets/btn-ok.png" alt="ok"><img class="prs" src="assets/btn-ok-pr.png" alt="">
+        </button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 2. AVATAR ================= -->
+<section class="screen" id="s-avatar">
+  <div class="stage">
+    <img class="bg" src="assets/bg-avatar.webp" alt="">
+    <button class="ibtn" data-go="s-login" style="left:3.4%;top:4.4%;width:9.6%;z-index:5" aria-label="Back">
+      <img class="nrm" src="assets/btn-back.png" alt=""><img class="prs" src="assets/btn-back-pr.png" alt="">
+    </button>
+    <!-- Avatar stands FULLY above the Confirm button: its stage bottom
+         (20.5cqw) clears the Confirm top (2cqw + 11.35cqw tall), so
+         head, outfit, legs and shoes are all visible before Confirm
+         is tapped. Distances are in cqw (stage-width units) like the
+         buttons, so the clearance holds at every aspect ratio. -->
+    <div class="abs charstage" id="charStage" style="left:5%;bottom:20.5cqw;width:23%;z-index:2">
+      <img id="charMain" data-role="char" src="assets/char-boy.png" alt="Your Globatar" style="width:100%">
+      <div class="eyes-ov" data-role="eyes"><span class="sclera-mask" data-role="maskL"></span><span class="sclera-mask" data-role="maskR"></span><img data-role="eyeL" src="assets/iris-04.png" alt=""><img data-role="eyeR" src="assets/iris-04.png" alt=""></div>
+      <div class="ovl" data-role="hair" style="z-index:3"></div>
+      <div class="ovl" data-role="cloth" style="z-index:3"></div>
+      <div class="ovl" data-role="shoe" style="z-index:3"></div>
+      <div class="ovl" data-role="acc" style="z-index:4"></div>
+      <div class="ovl" data-role="adv" style="z-index:5"></div>
+    </div>
+    <!-- Gender Boy/Girl choice: next to the character, in the gap
+         above Confirm. Changing it here changes the Passport too,
+         and changing it on the Passport changes it here. -->
+    <div class="gender-toggle" id="genderToggle" style="left:4.5%;bottom:15cqw;width:28%" role="group" aria-label="Gender">
+      <button class="gbtn boy sel" id="genderBoyBtn" aria-label="Boy">&#9794; Boy</button>
+      <button class="gbtn girl" id="genderGirlBtn" aria-label="Girl">&#9792; Girl</button>
+    </div>
+    <button class="ibtn" id="btnConfirm" style="left:8.6%;bottom:2cqw;width:26%;z-index:5" aria-label="Confirm">
+      <img class="nrm" src="assets/btn-confirm.png" alt="confirm"><img class="prs" src="assets/btn-confirm-pr.png" alt="">
+    </button>
+    <div class="tabs" id="avatarTabs" style="left:37%;top:9.5%;width:59.5%"></div>
+    <div class="panel" id="avatarPanel" style="left:37%;top:18%;width:59.5%;height:60%">
+      <div class="grid" id="avatarGrid"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 3. HOME ================= -->
+<section class="screen" id="s-home">
+  <div class="stage">
+    <img class="bg" src="assets/bg-home.webp" alt="">
+    <img class="abs" src="assets/home-hello.png" alt="Hello" style="left:6.8%;top:7.6%;width:25.8%">
+    <div class="hello-name" id="helloName" style="left:22%;top:9.9%;width:10.8%"></div>
+    <!-- Yellow profile button: opens the child's GLOBI PASSPORT
+         (buyer's passport design) — it must NEVER go back to the
+         log-in / form screen. -->
+    <button class="ibtn" id="btnPassport" style="right:3.4%;top:4.4%;width:9.6%" aria-label="My Globi Passport">
+      <img class="nrm" src="assets/btn-account.png" alt=""><img class="prs" src="assets/btn-account-pr.png" alt="">
+    </button>
+    <!-- PDF §4: "User globatar should be in the corner" — the child's
+         OWN live Globatar (same character / eyes / skin / outfit /
+         shoes picked on the Avatar screen, rendered by renderStage
+         like the other two stages) stands in the top corner next to
+         the profile button. Tapping it returns to the Avatar screen. -->
+    <div class="abs charstage" id="homeStage" style="right:14.2%;top:2.2%;width:8.6%;z-index:4" role="button" aria-label="Your Globatar — tap to change it" title="Your Globatar">
+      <img data-role="char" src="assets/char-boy.png" alt="Your Globatar" style="width:100%">
+      <div class="eyes-ov" data-role="eyes"><span class="sclera-mask" data-role="maskL"></span><span class="sclera-mask" data-role="maskR"></span><img data-role="eyeL" src="assets/iris-04.png" alt=""><img data-role="eyeR" src="assets/iris-04.png" alt=""></div>
+      <div class="ovl" data-role="hair" style="z-index:3"></div>
+      <div class="ovl" data-role="cloth" style="z-index:3"></div>
+      <div class="ovl" data-role="shoe" style="z-index:3"></div>
+      <div class="ovl" data-role="acc" style="z-index:4"></div>
+      <div class="ovl" data-role="adv" style="z-index:5"></div>
+    </div>
+    <button class="big-btn blue" data-go="s-map" id="btnWorldMap" style="position:absolute;left:50%;transform:translateX(-50%);top:3.2%;z-index:6;font-size:2.9cqw;padding:.6cqw 2.6cqw" aria-label="World Map">World Map</button>
+    <img class="abs" id="homeGlow" src="assets/home-glow.png" alt="" style="left:38.5%;top:15%;width:31%;animation:pulseGlow 2.2s ease-in-out infinite;pointer-events:none">
+    <img class="abs" id="homeAfrica" src="assets/home-africa.png" alt="" style="left:46.6%;top:27.5%;width:15.4%;pointer-events:none">
+    <button class="africa-hit" id="africaHit" style="left:44%;top:24%;width:21%;height:34%" aria-label="Click on Africa"></button>
+    <div class="abs bob" style="left:2.2%;bottom:12%;width:22.5%">
+      <img src="assets/home-char2.png" alt="" style="width:100%">
+      <img src="assets/home-char1.png" alt="Globi friend pointing at the Earth" style="position:absolute;left:0;top:0;width:100%">
+    </div>
+    <img class="abs bob" src="assets/home-bubble.png" alt="Click on Africa!" style="left:23.5%;top:41%;width:24.5%">
+    <!-- PDF §4: every continent LABELED. Africa — the first
+         destination — is bolded and highlighted in his yellow with
+         a green ring; the other six are shown locked / upcoming.
+         Drag the globe sideways and it SPINS through the labels,
+         landing back on Africa. -->
+    <div class="cont-chips" id="contChips">
+      <button class="cont-chip africa" data-cont="Africa">&#9733; AFRICA</button>
+      <button class="cont-chip" data-cont="Asia">Asia <span style="font-size:1.35cqw;opacity:.85">Locked</span></button>
+      <button class="cont-chip" data-cont="Europe">Europe <span style="font-size:1.35cqw;opacity:.85">Locked</span></button>
+      <button class="cont-chip" data-cont="North America">North America <span style="font-size:1.35cqw;opacity:.85">Locked</span></button>
+      <button class="cont-chip" data-cont="South America">South America <span style="font-size:1.35cqw;opacity:.85">Locked</span></button>
+      <button class="cont-chip" data-cont="Australia">Australia <span style="font-size:1.35cqw;opacity:.85">Locked</span></button>
+      <button class="cont-chip" data-cont="Antarctica">Antarctica <span style="font-size:1.35cqw;opacity:.85">Locked</span></button>
+    </div>
+    <div class="abs" style="left:3.4%;right:3.4%;bottom:2.8%;display:flex;gap:1.6%">
+      <button class="ibtn" data-go="s-avatar" style="position:relative;flex:1" aria-label="Avatar">
+        <img class="nrm" src="assets/btn-avatar.png" alt="avatar"><img class="prs" src="assets/btn-avatar-pr.png" alt="">
+      </button>
+      <button class="ibtn soon" data-soon="Books" style="position:relative;flex:1" aria-label="Books">
+        <img class="nrm" src="assets/btn-books.png" alt="books"><img class="prs" src="assets/btn-books-pr.png" alt="">
+      </button>
+      <button class="ibtn soon" data-soon="Games" style="position:relative;flex:1" aria-label="Games">
+        <img class="nrm" src="assets/btn-games.png" alt="games"><img class="prs" src="assets/btn-games-pr.png" alt="">
+      </button>
+      <button class="ibtn soon" data-soon="Snap Words" style="position:relative;flex:1" aria-label="Snap Words">
+        <img class="nrm" src="assets/btn-snap.png" alt="snap words"><img class="prs" src="assets/btn-snap-pr.png" alt="">
+      </button>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 3A. WORLD MAP (PDF §4 "What I want to add") =================
+     The SECOND Home screen the buyer asked for: a framed FLAT
+     map of the world — every continent labeled, Africa bolded
+     and highlighted, the others locked, clean tabs along the top
+     (Quest / Videos / Books / Songs / Games) and the child's own
+     Globatar in a profile card at the top right. Reached from
+     the globe Home by the World Map button or by tapping Africa
+     on the globe; tapping Africa ON THE MAP enters the Africa
+     screen. GLOBI branding only. -->
+<section class="screen" id="s-map">
+  <div class="stage map-sky">
+    <button class="ibtn" data-go="s-home" style="left:2.2%;top:2.6%;width:8.4%;z-index:6" aria-label="Back">
+      <img class="nrm" src="assets/btn-back.png" alt=""><img class="prs" src="assets/btn-back-pr.png" alt="">
+    </button>
+    <div class="map-tabs">
+      <button class="map-tab q" data-go="s-africa">Quest</button>
+      <button class="map-tab v soon" data-soon="Videos">Videos</button>
+      <button class="map-tab b soon" data-soon="Books">Books</button>
+      <button class="map-tab s soon" data-soon="Songs">Songs</button>
+      <button class="map-tab g soon" data-soon="Games">Games</button>
+    </div>
+    <div class="map-profile">
+      <div class="charstage" id="mapStage" style="position:relative;width:34%;flex:none">
+        <img data-role="char" src="assets/char-boy.png" alt="Your Globatar" style="width:100%">
+        <div class="eyes-ov" data-role="eyes"><span class="sclera-mask" data-role="maskL"></span><span class="sclera-mask" data-role="maskR"></span><img data-role="eyeL" src="assets/iris-04.png" alt=""><img data-role="eyeR" src="assets/iris-04.png" alt=""></div>
+        <div class="ovl" data-role="hair" style="z-index:3"></div>
+        <div class="ovl" data-role="cloth" style="z-index:3"></div>
+        <div class="ovl" data-role="shoe" style="z-index:3"></div>
+        <div class="ovl" data-role="acc" style="z-index:4"></div>
+        <div class="ovl" data-role="adv" style="z-index:5"></div>
+      </div>
+      <div style="min-width:0">
+        <div class="pname" id="mapProfName"></div>
+        <div class="pstars"><img src="assets/star.png" alt="stars"><span id="mapProfStars">0</span></div>
+      </div>
+    </div>
+    <div class="map-frame">
+      <div class="map-title">MAP OF THE WORLD</div>
+      <svg viewBox="0 0 1200 740" preserveAspectRatio="none" aria-label="Map of the world with all seven continents labeled">
+        <!-- Detailed continent shapes in the buyer's reference
+             colours and positions: Alaska and Hudson Bay on North
+             America, Brazil's bulge on South America, Scandinavia
+             and the Italian boot on Europe, the Horn and Madagascar
+             on Africa, India / Arabia / South-East Asia and the
+             Indonesian islands on Asia & Oceania, Cape York and
+             Tasmania on Australia — and Antarctica as a full ice
+             band along the bottom, completely inside the frame. -->
+        <path d="M70,150 L95,105 L150,78 L205,88 L250,70 L300,78 L345,66 L375,84 L360,110 L385,128 L352,150 L368,168 L340,185 L385,190 L420,168 L448,178 L462,205 L438,228 L452,252 L428,268 L446,292 L430,318 L408,296 L392,268 L352,278 L330,306 L318,338 L296,330 L282,296 L246,282 L214,246 L178,238 L150,205 L118,196 L92,172 Z" fill="#F28C28" stroke="#C96A12" stroke-width="4" stroke-linejoin="round"/>
+        <path d="M312,332 L340,326 L378,344 L414,372 L428,392 L402,398 L368,372 L334,354 Z" fill="#F28C28" stroke="#C96A12" stroke-width="4" stroke-linejoin="round"/>
+        <path d="M478,84 L520,58 L572,66 L584,96 L548,118 L496,112 L474,100 Z" fill="#F4FAFF" stroke="#B9D9EA" stroke-width="4" stroke-linejoin="round"/>
+        <path d="M372,392 L420,378 L462,398 L486,428 L462,452 L478,486 L452,522 L436,568 L420,616 L398,640 L382,596 L372,540 L352,486 L338,436 L348,404 Z" fill="#7CB342" stroke="#558B2F" stroke-width="4" stroke-linejoin="round"/>
+        <path d="M588,158 L606,146 L614,162 L600,174 L586,168 Z" fill="#9575CD" stroke="#6D4C9F" stroke-width="3.5" stroke-linejoin="round"/>
+        <path d="M556,232 L566,198 L596,188 L612,204 L606,226 L628,214 L618,182 L640,168 L628,140 L652,118 L684,102 L706,122 L694,150 L716,158 L738,142 L744,172 L722,190 L736,214 L706,232 L690,214 L684,240 L672,262 L656,238 L640,246 L622,238 Z" fill="#9575CD" stroke="#6D4C9F" stroke-width="4" stroke-linejoin="round"/>
+        <path class="map-africa-shape" d="M566,318 L596,282 L652,272 L706,282 L734,306 L724,330 L762,338 L788,366 L762,392 L730,388 L716,424 L700,478 L668,528 L636,540 L612,496 L590,440 L566,392 L548,352 Z" fill="#FFCA28" stroke="#E8910F" stroke-width="5" stroke-linejoin="round"/>
+        <path class="map-africa-shape" d="M742,428 L766,424 L774,452 L758,492 L738,478 L736,448 Z" fill="#FFCA28" stroke="#E8910F" stroke-width="4" stroke-linejoin="round"/>
+        <path d="M738,208 L772,214 L786,244 L770,282 L738,276 L726,238 Z" fill="#D64550" stroke="#A52A36" stroke-width="4" stroke-linejoin="round"/>
+        <path d="M742,196 L770,168 L812,150 L838,116 L884,92 L946,70 L1030,62 L1108,74 L1140,104 L1118,132 L1146,158 L1122,196 L1096,214 L1108,246 L1072,262 L1052,238 L1018,252 L1002,286 L962,300 L958,332 L934,352 L918,318 L922,286 L890,272 L872,308 L852,344 L832,300 L806,268 L776,272 L762,240 L742,224 Z" fill="#D64550" stroke="#A52A36" stroke-width="4" stroke-linejoin="round"/>
+        <ellipse cx="905" cy="385" rx="34" ry="10" transform="rotate(-25 905 385)" fill="#D64550"/>
+        <ellipse cx="995" cy="362" rx="26" ry="20" fill="#D64550"/>
+        <ellipse cx="965" cy="408" rx="40" ry="9" fill="#D64550"/>
+        <ellipse cx="1045" cy="372" rx="14" ry="10" fill="#D64550"/>
+        <ellipse cx="1108" cy="388" rx="42" ry="13" fill="#D64550"/>
+        <path d="M962,486 L986,452 L1032,442 L1064,458 L1086,440 L1104,446 L1096,478 L1128,492 L1142,524 L1118,556 L1064,566 L1002,560 L962,536 L948,508 Z" fill="#B03A48" stroke="#7E2733" stroke-width="4" stroke-linejoin="round"/>
+        <ellipse cx="1108" cy="584" rx="16" ry="9" fill="#B03A48" stroke="#7E2733" stroke-width="3"/>
+        <path d="M36,668 L180,652 L330,664 L470,650 L620,662 L770,650 L920,664 L1060,652 L1164,666 L1150,716 L1080,726 L940,718 L790,728 L640,718 L480,728 L330,718 L180,726 L52,720 Z" fill="#F4FAFF" stroke="#B9D9EA" stroke-width="4" stroke-linejoin="round"/>
+        <text class="map-lbl" x="250" y="178" font-size="30" text-anchor="middle">NORTH</text>
+        <text class="map-lbl" x="250" y="214" font-size="30" text-anchor="middle">AMERICA</text>
+        <text class="map-lbl" x="398" y="482" font-size="26" text-anchor="middle">SOUTH</text>
+        <text class="map-lbl" x="398" y="512" font-size="26" text-anchor="middle">AMERICA</text>
+        <text class="map-lbl" x="645" y="182" font-size="25" text-anchor="middle">EUROPE</text>
+        <text class="map-lbl map-lbl-dark" x="652" y="390" font-size="36" text-anchor="middle">AFRICA</text>
+        <text class="map-lbl" x="958" y="182" font-size="30" text-anchor="middle">ASIA &amp;</text>
+        <text class="map-lbl" x="958" y="218" font-size="30" text-anchor="middle">OCEANIA</text>
+        <text class="map-lbl" x="1045" y="518" font-size="23" text-anchor="middle">AUSTRALIA</text>
+        <text class="map-lbl map-lbl-dark" x="600" y="702" font-size="25" text-anchor="middle">ANTARCTICA</text>
+        <g><circle cx="250" cy="258" r="16" fill="#1293F5" stroke="#fff" stroke-width="3.5"/><text x="250" y="266" font-size="20" text-anchor="middle" fill="#fff" font-family="Jua">5</text></g>
+        <g><circle cx="400" cy="560" r="16" fill="#1293F5" stroke="#fff" stroke-width="3.5"/><text x="400" y="568" font-size="20" text-anchor="middle" fill="#fff" font-family="Jua">4</text></g>
+        <g><circle cx="668" cy="224" r="16" fill="#1293F5" stroke="#fff" stroke-width="3.5"/><text x="668" y="232" font-size="20" text-anchor="middle" fill="#fff" font-family="Jua">2</text></g>
+        <g><circle cx="940" cy="258" r="16" fill="#1293F5" stroke="#fff" stroke-width="3.5"/><text x="940" y="266" font-size="20" text-anchor="middle" fill="#fff" font-family="Jua">1</text></g>
+        <g><circle cx="1050" cy="470" r="15" fill="#1293F5" stroke="#fff" stroke-width="3.5"/><text x="1050" y="477" font-size="19" text-anchor="middle" fill="#fff" font-family="Jua">6</text></g>
+        <g transform="translate(655 448)"><polygon points="0,-20 5.9,-8.1 19,-6.2 9.5,3.1 11.8,16.2 0,10 -11.8,16.2 -9.5,3.1 -19,-6.2 -5.9,-8.1" fill="#FFC400" stroke="#E8910F" stroke-width="2.5"/></g>
+      </svg>
+      <button class="map-hit" id="mapAfricaHit" style="left:44%;top:36%;width:23%;height:40%" aria-label="Africa — tap to explore"></button>
+      <button class="abs locked-land" data-land="North America" style="left:4%;top:6%;width:36%;height:42%;z-index:4" aria-label="North America — locked"></button>
+      <button class="abs locked-land" data-land="South America" style="left:26%;top:49%;width:17%;height:38%;z-index:4" aria-label="South America — locked"></button>
+      <button class="abs locked-land" data-land="Europe" style="left:44%;top:11%;width:19%;height:24%;z-index:4" aria-label="Europe — locked"></button>
+      <button class="abs locked-land" data-land="Asia and Oceania" style="left:60%;top:6%;width:37%;height:48%;z-index:4" aria-label="Asia and Oceania — locked"></button>
+      <button class="abs locked-land" data-land="Australia" style="left:77%;top:58%;width:20%;height:23%;z-index:4" aria-label="Australia — locked"></button>
+      <button class="abs locked-land" data-land="Antarctica" style="left:3%;top:87%;width:94%;height:11%;z-index:4" aria-label="Antarctica — locked"></button>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 3B. GLOBI PASSPORT =================
+     Opened ONLY from the yellow profile button on Home. Layout,
+     colours and stamps follow the buyer's passport image (A5DCCB59)
+     exactly; every personal field is LIVE (buildPassport fills it
+     from S each time the page opens) — the sample name in the
+     buyer's image is never shown. Back returns to Home. -->
+<section class="screen" id="s-passport">
+  <div class="stage pp-sky">
+    <button class="ibtn" data-go="s-home" style="left:2.2%;top:2%;width:8%;z-index:6" aria-label="Back">
+      <img class="nrm" src="assets/btn-back.png" alt=""><img class="prs" src="assets/btn-back-pr.png" alt="">
+    </button>
+    <!-- The page itself is the buyer's passport image, cropped from
+         A5DCCB59 (assets/passport-book.webp): his sky, flags, plane,
+         book, font, labels, red crown seal, stamps and barcode are
+         all his own pixels — same to same. Overlaid on it, in his
+         exact places: the child's live Globatar (full body, head to
+         shoes) in the blue photo box, the live Name in his Name
+         pill, the live Gender in his Gender pill, the 7 tab
+         hit-areas over his tab row, and the tab grids on a clean
+         opaque panel over his baked eye grid — every tab shows
+         only its own cells there (the picked one carries the
+         live purple ring); no eye cell shows behind another tab.
+         Status "Globi Jr.", Passport No.
+         GLOBI-001 and Nationality "Globian" are read straight from
+         his image, exactly as he drew them. -->
+    <div class="pp-wrap">
+      <img class="pp-art" src="assets/passport-book.webp" alt="Globi Passport">
+      <div class="pp-photo">
+        <svg class="pp-plane" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 2 L11 13 M22 2 L15 22 L11 13 L2 9 Z" fill="none" stroke="#fff" stroke-width="2" stroke-linejoin="round"/></svg>
+        <div class="charstage" id="passportStage">
+          <img data-role="char" src="assets/char-boy.png" alt="Your Globatar photo" style="width:100%">
+          <div class="eyes-ov" data-role="eyes"><span class="sclera-mask" data-role="maskL"></span><span class="sclera-mask" data-role="maskR"></span><img data-role="eyeL" src="assets/iris-04.png" alt=""><img data-role="eyeR" src="assets/iris-04.png" alt=""></div>
+          <div class="ovl" data-role="hair" style="z-index:3"></div>
+          <div class="ovl" data-role="cloth" style="z-index:3"></div>
+          <div class="ovl" data-role="shoe" style="z-index:3"></div>
+          <div class="ovl" data-role="acc" style="z-index:4"></div>
+          <div class="ovl" data-role="adv" style="z-index:5"></div>
+        </div>
+      </div>
+      <div class="pp-pillO" id="ppNamePill"><span id="ppName"></span></div>
+      <div class="pp-pillO" id="ppGenderPill" role="button" tabindex="0" aria-label="Gender — tap to change between Boy and Girl" title="Tap to change Boy / Girl"><span class="pp-gender-sym" id="ppGenderSym">&#9794;</span><span id="ppGender">Boy</span></div>
+      <div class="pp-tabsO" id="ppTabs">
+        <button class="pp-tab" aria-label="Character"></button>
+        <button class="pp-tab" aria-label="Skin"></button>
+        <button class="pp-tab" aria-label="Hair"></button>
+        <button class="pp-tab" aria-label="Makeup"></button>
+        <button class="pp-tab sel" aria-label="Eyes"></button>
+        <button class="pp-tab" aria-label="Shoes"></button>
+        <button class="pp-tab" aria-label="Adventure"></button>
+      </div>
+      <div id="ppGridPanel"></div>
+      <div id="ppEyeGrid"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 4. AFRICA ================= -->
+<section class="screen" id="s-africa">
+  <div class="stage">
+    <img class="bg" src="assets/bg-africa.webp" alt="">
+    <button class="ibtn" data-go="s-home" style="left:3.4%;top:4.4%;width:9.6%" aria-label="Home">
+      <img class="nrm" src="assets/btn-home.png" alt=""><img class="prs" src="assets/btn-home-pr.png" alt="">
+    </button>
+    <img class="abs" src="assets/africa-title.png" alt="AFRICA" style="left:32.5%;top:9.5%;width:35%">
+    <button class="abs" id="kenyaHit" style="left:3.5%;top:28%;width:46.5%;line-height:0;cursor:pointer" aria-label="Kenya">
+      <img src="assets/island-kenya.png" alt="Kenya — mountains, elephant and lake" style="width:100%">
+    </button>
+    <img class="abs" src="assets/label-kenya.png" alt="KENYA" style="left:14.5%;top:55.5%;width:16.3%">
+    <button class="abs locked-land" data-land="Egypt" style="right:3.5%;top:28%;width:46.5%;line-height:0;cursor:pointer" aria-label="Egypt">
+      <img src="assets/island-egypt.png" alt="Egypt — pyramids and camel" style="width:100%">
+    </button>
+    <img class="abs" src="assets/label-egypt.png" alt="EGYPT" style="right:14.5%;top:55.5%;width:16.3%">
+    <button class="abs locked-land" data-land="Sudan" style="left:32.5%;top:60.5%;width:47%;line-height:0;cursor:pointer" aria-label="Sudan">
+      <img src="assets/island-sudan.png" alt="Sudan — river and hills" style="width:100%">
+    </button>
+    <img class="abs" src="assets/label-sudan.png" alt="SUDAN" style="left:41.8%;top:87%;width:16.3%">
+    <img class="abs bob" src="assets/africa-char.png" alt="Globi friend in a red dress" style="left:.5%;bottom:.5%;width:21%">
+    <img class="abs bob" src="assets/africa-bubble.png" alt="Click on Kenya!" style="left:19.8%;top:63.5%;width:16.5%">
+  </div>
+</section>
+
+<!-- ================= 5. KENYA MINI-LESSON ================= -->
+<section class="screen" id="s-lesson">
+  <div class="stage">
+    <img class="bg" src="assets/bg-lesson.webp" alt="">
+    <button class="ibtn" data-go="s-africa" style="left:3.4%;top:4.4%;width:9.6%" aria-label="Back">
+      <img class="nrm" src="assets/btn-back2.png" alt=""><img class="prs" src="assets/btn-back2-pr.png" alt="">
+    </button>
+    <img class="abs" src="assets/lesson-kenya.png" alt="KENYA" style="left:36.5%;top:4.2%;width:27%">
+    <div class="bubble-css" style="left:7.2%;top:23.5%;width:23.5%">Welcome to<br>Kenya!<br>let's learn<br>CVC words!</div>
+    <img class="abs bob" id="lessonChar" src="assets/lesson-char.png" alt="Globi safari friend" style="left:3%;bottom:2.5%;width:23%;z-index:6">
+    <div class="ovl" id="advBadgeLesson" style="left:14.5%;bottom:12%;width:6%;z-index:4"></div>
+    <div class="abs" id="boardWrap" style="left:32.4%;top:22.3%;width:62.2%">
+      <img id="boardImg" src="assets/lesson-board.webp" alt="Learn CVC words: cat, bus, mud, fan, pig, top" style="width:100%">
+      <button class="ibtn" id="btnTri" style="left:50%;top:50%;transform:translate(-50%,-50%);width:16.5%" aria-label="Play the lesson">
+        <img class="nrm" src="assets/btn-tri.png" alt=""><img class="prs" src="assets/btn-tri-pr.png" alt="">
+      </button>
+      <div id="hotLayer" style="position:absolute;inset:0;display:none">
+        <button class="hot" data-word="cat" style="left:5.5%;top:27%;width:38.5%;height:16.5%" aria-label="cat"></button>
+        <button class="hot" data-word="bus" style="left:52.5%;top:27%;width:38.5%;height:16.5%" aria-label="bus"></button>
+        <button class="hot" data-word="mud" style="left:5.5%;top:46.5%;width:38.5%;height:16.5%" aria-label="mud"></button>
+        <button class="hot" data-word="fan" style="left:52.5%;top:46.5%;width:38.5%;height:16.5%" aria-label="fan"></button>
+        <button class="hot" data-word="pig" style="left:5.5%;top:66%;width:38.5%;height:16.5%" aria-label="pig"></button>
+        <button class="hot" data-word="top" style="left:52.5%;top:66%;width:38.5%;height:16.5%" aria-label="top"></button>
+      </div>
+    </div>
+    <button class="ibtn" id="btnLessonPlay" style="right:10%;top:calc(24.3% + 37.63cqw);width:18%" aria-label="Play">
+      <img class="nrm" src="assets/btn-play.png" alt="play"><img class="prs" src="assets/btn-play-pr.png" alt="">
+    </button>
+    <!-- PDF §5: short video-style introduction AFTER clicking Kenya —
+         the buyer's own savanna artwork pans like a video while fact
+         cards introduce Kenya's mountain, animals, lake and capital.
+         Skip or the final "Let's Learn!" card ends it; then the
+         safari friend walks in and the phonics lesson plays. -->
+    <div class="kenya-intro" id="kenyaIntro">
+      <img class="kipan" src="assets/bg-game.webp" alt="Kenya — snowy mountain, savanna, elephants and a lake">
+      <img class="ki-title" src="assets/lesson-kenya.png" alt="KENYA">
+      <div class="ki-card" id="kiCard">Welcome to Kenya!</div>
+      <div class="ki-dots" id="kiDots"><i class="on"></i><i></i><i></i><i></i></div>
+      <button class="big-btn orange ki-skip" id="kiSkip">Skip</button>
+      <button class="big-btn ki-go" id="kiGo">Let's Learn!</button>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 6. GAME ================= -->
+<section class="screen" id="s-game">
+  <div class="stage">
+    <div id="gameView">
+      <div id="world">
+        <img class="wbg" src="assets/bg-game.webp" alt="">
+        <img class="wplat" src="assets/game-platforms.webp" alt="">
+        <div id="pickLayer"></div>
+        <img id="player" src="assets/game-char.png" alt="Globi safari friend jumping">
+        <div class="ovl" id="advBadgeGame" style="width:3.4%;z-index:7"></div>
+      </div>
+    </div>
+    <button class="ibtn" id="btnPause" style="left:3.4%;top:4.4%;width:9.6%;z-index:10" aria-label="Pause">
+      <img class="nrm" src="assets/btn-pause.png" alt=""><img class="prs" src="assets/btn-pause-pr.png" alt="">
+    </button>
+    <div class="hud-counter" style="right:2%;top:2%;width:17.5%;height:5.4%">
+      <img class="bar" src="assets/counter-bar.png" alt=""><span class="num" id="starNum">0/15</span><img class="ic" src="assets/star.png" alt="stars">
+    </div>
+    <div class="hud-counter" style="right:2%;top:8.6%;width:17.5%;height:5.4%">
+      <img class="bar" src="assets/counter-bar.png" alt=""><span class="num" id="orbNum">0/5</span><img class="ic" src="assets/orb.png" alt="superpowers">
+    </div>
+    <button class="tctrl" id="tcLeft" style="left:3%" aria-label="Move left">&#9664;</button>
+    <button class="tctrl" id="tcRight" style="left:14.5%" aria-label="Move right">&#9654;</button>
+    <button class="tctrl jump" id="tcJump" style="right:3.5%" aria-label="Jump">JUMP</button>
+    <div class="popup-wrap" id="pauseWrap" style="z-index:15">
+      <div class="pause-panel" style="left:50%;top:50%;transform:translate(-50%,-50%);width:52%">
+        <div style="font-size:5cqw;color:#43C91E;margin-bottom:1.6cqw">Paused</div>
+        <button class="big-btn" id="btnResume">Resume</button>
+        <div style="height:1.4cqw"></div>
+        <button class="big-btn orange" id="btnRestart">Restart</button>
+        <div style="height:1.4cqw"></div>
+        <button class="big-btn blue" data-go="s-home">Home</button>
+      </div>
+    </div>
+    <!-- skill check -->
+    <div class="sc-wrap" id="scWrap">
+      <div class="sc-totals" aria-label="Stars and gems earned"><img src="assets/star.png" alt="stars"> <span id="scStars">0</span> &nbsp;<img src="assets/orb.png" alt="gems"> <span id="scOrbs">0</span></div>
+      <div class="sc-board pop">
+        <img src="assets/sc-board.webp" alt="Skill check">
+        <div class="sc-pic-cover" id="scPicCover" style="left:39.5%;top:29%;width:21%;height:31%"></div>
+        <img class="sc-pic" id="scPic" src="assets/cvc-cat.png" alt="" style="left:41%;top:31%;width:18%;height:27%">
+        <div class="sc-cellwrap" style="left:23.5%;top:65%;width:41%">
+          <img id="scCellImg" src="assets/sc-bs.png" alt="b _ s">
+          <div class="word-txt" id="scWordTxt" style="display:none"></div>
+        </div>
+        <button class="ibtn" id="btnMic" style="right:9%;top:63.5%;width:15.5%" aria-label="Microphone — say the word">
+          <img class="nrm" src="assets/btn-mic.png" alt=""><img class="prs" src="assets/btn-mic-pr.png" alt="">
+        </button>
+      </div>
+      <div class="vowel-row" style="left:50%;transform:translateX(-50%);top:80.5%">
+        <button class="ibtn vowel" data-v="a" aria-label="a"><img class="nrm" src="assets/btn-a.png" alt="a"><img class="prs" src="assets/btn-a-pr.png" alt=""></button>
+        <button class="ibtn vowel" data-v="e" aria-label="e"><img class="nrm" src="assets/btn-e.png" alt="e"><img class="prs" src="assets/btn-e-pr.png" alt=""></button>
+        <button class="ibtn vowel" data-v="i" aria-label="i"><img class="nrm" src="assets/btn-i.png" alt="i"><img class="prs" src="assets/btn-i-pr.png" alt=""></button>
+        <button class="ibtn vowel" data-v="o" aria-label="o"><img class="nrm" src="assets/btn-o.png" alt="o"><img class="prs" src="assets/btn-o-pr.png" alt=""></button>
+        <button class="ibtn vowel" data-v="u" aria-label="u"><img class="nrm" src="assets/btn-u.png" alt="u"><img class="prs" src="assets/btn-u-pr.png" alt=""></button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 7. REWARD ================= -->
+<section class="screen" id="s-reward">
+  <div class="stage">
+    <div class="party-bg"></div>
+    <svg class="party-bunting" viewBox="0 0 1600 130" preserveAspectRatio="none" aria-hidden="true">
+      <path d="M0,6 Q800,130 1600,6" fill="none" stroke="#7A6FB0" stroke-width="5"/>
+      <polygon points="88,10 152,14 118,66" fill="#FF6FA5"/>
+      <polygon points="258,28 322,32 288,84" fill="#FFC93C"/>
+      <polygon points="428,42 492,46 458,98" fill="#2EC4B6"/>
+      <polygon points="598,52 662,54 628,106" fill="#4A9BE0"/>
+      <polygon points="768,56 832,56 800,110" fill="#B04DF0"/>
+      <polygon points="938,54 1002,52 970,106" fill="#FF8A00"/>
+      <polygon points="1108,46 1172,42 1142,98" fill="#FF6FA5"/>
+      <polygon points="1278,32 1342,28 1312,84" fill="#2EC4B6"/>
+      <polygon points="1448,14 1512,10 1482,66" fill="#FFC93C"/>
+    </svg>
+    <div class="party-bubble">Great job collecting, you cleaned up all the obstacles!</div>
+    <svg class="party-char" viewBox="0 0 300 340" role="img" aria-label="Purple party friend with a party hat">
+      <ellipse cx="112" cy="322" rx="34" ry="12" fill="#8B5FC7"/>
+      <ellipse cx="192" cy="322" rx="34" ry="12" fill="#8B5FC7"/>
+      <path d="M150 108 C225 108 258 168 258 228 C258 292 212 326 150 326 C88 326 42 292 42 228 C42 168 75 108 150 108 Z" fill="#B794E6" stroke="#8B5FC7" stroke-width="5"/>
+      <polygon points="98,26 148,118 52,112" fill="#FF6FA5"/>
+      <polygon points="84,58 138,120 66,112" fill="#FFC93C" opacity=".85"/>
+      <circle cx="97" cy="22" r="15" fill="#FF9F1C" stroke="#E07B00" stroke-width="4"/>
+      <ellipse cx="52" cy="118" rx="17" ry="9" fill="#FF9F1C"/>
+      <ellipse cx="116" cy="205" rx="17" ry="27" fill="#241F31"/>
+      <ellipse cx="184" cy="205" rx="17" ry="27" fill="#241F31"/>
+      <circle cx="122" cy="194" r="6" fill="#fff"/>
+      <circle cx="190" cy="194" r="6" fill="#fff"/>
+      <circle cx="82" cy="248" r="13" fill="#F2A7C3" opacity=".8"/>
+      <circle cx="218" cy="248" r="13" fill="#F2A7C3" opacity=".8"/>
+      <ellipse cx="150" cy="238" rx="9" ry="6.5" fill="#FF9F1C"/>
+      <path d="M132 262 Q150 276 168 262" fill="none" stroke="#5B3A8E" stroke-width="5" stroke-linecap="round"/>
+      <g transform="rotate(18 252 268)">
+        <polygon points="238,250 272,258 240,282" fill="#FFC93C" stroke="#E0A800" stroke-width="3"/>
+        <path d="M268 252 q26 -14 34 4 q5 12 -8 14 q22 2 16 14 q-5 10 -18 4" fill="none" stroke="#FF6FA5" stroke-width="6" stroke-linecap="round"/>
+      </g>
+    </svg>
+    <svg class="party-balloons" viewBox="0 0 220 260" aria-hidden="true">
+      <polygon points="110,18 126,86 192,66 140,112 168,168 110,136 52,168 80,112 28,66 94,86" fill="#FFE9A8" opacity=".75"/>
+      <path d="M62 108 Q96 170 110 232 M118 84 Q112 160 110 232 M168 104 Q140 170 110 232 M88 128 Q104 180 110 232 M146 130 Q128 184 110 232" fill="none" stroke="#7A6FB0" stroke-width="2.5"/>
+      <ellipse cx="62" cy="72" rx="30" ry="37" fill="#FF6FA5"/>
+      <ellipse cx="118" cy="48" rx="30" ry="37" fill="#2EC4B6"/>
+      <ellipse cx="168" cy="70" rx="29" ry="36" fill="#FFC93C"/>
+      <ellipse cx="88" cy="106" rx="27" ry="33" fill="#4A9BE0"/>
+      <ellipse cx="146" cy="108" rx="27" ry="33" fill="#B04DF0"/>
+      <circle cx="52" cy="60" r="8" fill="#fff" opacity=".55"/>
+      <circle cx="108" cy="36" r="8" fill="#fff" opacity=".55"/>
+      <circle cx="159" cy="58" r="7" fill="#fff" opacity=".55"/>
+    </svg>
+    <div id="fallLayer" style="position:absolute;inset:0;overflow:hidden"></div>
+    <div class="reward-panel">
+      <h2>You Did It!</h2>
+      <div class="big-stars">
+        <img src="assets/star.png" alt="star"><img src="assets/star.png" alt="star"><img src="assets/star.png" alt="star">
+      </div>
+      <div style="font-size:3.4cqw">Kenya &mdash; Level 1 Complete!</div>
+      <div class="totals">
+        <span><img src="assets/star.png" alt=""> <b id="finalStars">15</b> stars</span>
+        <span><img src="assets/orb.png" alt=""> <b id="finalOrbs">5</b> superpowers</span>
+      </div>
+      <button class="big-btn" id="btnNext">Next Level</button>
+      <div style="height:1.4cqw"></div>
+      <button class="big-btn blue" data-go="s-home">Menu</button>
+      <div style="height:1.4cqw"></div>
+      <button class="big-btn orange" id="btnAgain">Play Again</button>
+    </div>
+  </div>
+</section>
+
+</div>
+<div id="toast" role="status"></div>
+
+<script>
+"use strict";
+/* ================= state ================= */
+var S = { name:"", age:"", school:"", gender:"boy", genderSel:"boy", stars:0, orbs:0, hair:"", cloth:"", shoes:"", acc:"", adv:"" };
+/* ================= voice (natural, warm teacher voice) ================= */
+var KID_VOICE=null;
+function pickVoice(){
+  if(!("speechSynthesis" in window)) return;
+  var vs=[]; try{ vs=speechSynthesis.getVoices()||[]; }catch(e){}
+  var en=vs.filter(function(v){return /^en[-_]/i.test(v.lang);});
+  var pool=en.length?en:vs;
+  var pref=["Google US English","Google UK English Female","Samantha","Microsoft Zira","Karen","Moira","Female"];
+  for(var i=0;i<pref.length;i++){ for(var j=0;j<pool.length;j++){ if(pool[j].name.indexOf(pref[i])>-1){ KID_VOICE=pool[j]; return; } } }
+  KID_VOICE=pool[0]||null;
+}
+if("speechSynthesis" in window){ pickVoice(); try{ speechSynthesis.onvoiceschanged=pickVoice; }catch(e){} }
+function speak(text){
+  if(!("speechSynthesis" in window)) return;
+  try{
+    speechSynthesis.cancel();
+    var u=new SpeechSynthesisUtterance(text);
+    if(KID_VOICE) u.voice=KID_VOICE;
+    u.lang="en-US"; u.pitch=1.15; u.rate=0.9;
+    speechSynthesis.speak(u);
+  }catch(e){}
+}
+/* Stop ALL voice immediately: cancels the line currently playing AND
+   every scheduled lesson line that has not started yet. The lesson
+   reads its CVC words on timers (seqTimers), so a plain cancel() is
+   not enough — those pending timers would keep firing speak() on the
+   NEXT screen (the bug where "Learn CVC words" kept reading over the
+   game). Clearing the timers here means no voice from a screen can
+   ever be heard after leaving it. */
+function stopVoice(){
+  if("speechSynthesis" in window){ try{ speechSynthesis.cancel(); }catch(e){} }
+  if(typeof seqTimers!=="undefined" && seqTimers){ seqTimers.forEach(clearTimeout); seqTimers.length=0; }
+  if(typeof kiTimers!=="undefined" && kiTimers){ kiTimers.forEach(clearTimeout); kiTimers.length=0; }
+  if(typeof lessonOn!=="undefined") lessonOn=false;
+  document.querySelectorAll(".hot").forEach(function(h){ h.classList.remove("lit"); });
+}
+/* ================= helpers ================= */
+function $(id){ return document.getElementById(id); }
+var toastT=null;
+function toast(msg,ms){
+  var t=$("toast"); t.textContent=msg; t.classList.add("on");
+  clearTimeout(toastT); toastT=setTimeout(function(){ t.classList.remove("on"); }, ms||2600);
+}
+/* FULL-BLEED STAGE: there is no frame and no backdrop layer.
+   Each screen IS the whole viewport (100vw x 100dvh); its ONE
+   background image covers the entire viewport exactly once
+   (object-fit:cover, no repeat, no second copy) and every piece
+   of content is laid out in % of that full screen, so the
+   buyer's design alone fills PC, iPad and mobile edge to edge
+   with nothing at the sides. */
+function go(id){
+  /* EVERY screen change silences the previous screen first — Back,
+     Home, Play, Confirm, all of them come through here. */
+  stopVoice();
+  var sc=document.querySelectorAll(".screen");
+  for(var i=0;i<sc.length;i++) sc[i].classList.toggle("active", sc[i].id===id);
+  $("app").style.background="transparent";
+  if(id==="s-home"){ $("helloName").textContent=S.name||""; }
+  if(id==="s-map"){ buildMap(); }
+  if(id==="s-passport"){ buildPassport(); }
+  if(id==="s-game"){ startGame(); }
+  if(id!=="s-game"){ stopGame(); }
+}
+document.addEventListener("click",function(e){
+  var b=e.target.closest("[data-go]");
+  if(b){ go(b.getAttribute("data-go")); }
+  var sn=e.target.closest(".soon");
+  if(sn){ var n=sn.getAttribute("data-soon"); toast(n+" is coming soon — first, click on Africa!"); speak(n+" is coming soon! First, click on Africa!"); }
+});
+/* ================= 1. LOGIN =================
+   Flow (exactly the buyer's mockup): fill Name / Age / School → tap the
+   Acknowledgment row → the green tick appears AND the Acknowledgment
+   popup opens → tap OK on the popup → enter the Avatar screen.
+   The tick does NOT show before the form is complete, and OK always
+   leaves the log-in screen when the form is complete. */
+var ackChecked=false;
+var cells=document.querySelectorAll(".cell");
+function cellVal(f){ return $(f==="name"?"in-name":f==="age"?"in-age":"in-school").value.trim(); }
+function missingFields(){
+  var m=[];
+  ["name","age","school"].forEach(function(f){ if(!cellVal(f)) m.push(f); });
+  cells.forEach(function(c){ c.classList.toggle("missing", m.indexOf(c.getAttribute("data-field"))>-1); });
+  return m;
+}
+$("ackRow").addEventListener("click",function(){
+  if(missingFields().length){
+    ackChecked=false; $("ackRow").classList.remove("on");
+    toast("First, tap Name, Age and School and fill them in!");
+    speak("First, tap Name, Age and School, and fill them in!");
+    return;
+  }
+  ackChecked=true; $("ackRow").classList.add("on"); $("ackRow").classList.remove("pulse");
+  $("ackPopup").classList.add("on");
+  speak("Acknowledgment. By using this application, you agree that all user data will be stored securely and used only for educational and personalization purposes.");
+});
+$("ackOk").addEventListener("click",function(){
+  $("ackPopup").classList.remove("on");
+  if(missingFields().length){
+    ackChecked=false; $("ackRow").classList.remove("on");
+    toast("First, tap Name, Age and School and fill them in!");
+    speak("First, tap Name, Age and School, and fill them in!");
+    return;
+  }
+  ackChecked=true; $("ackRow").classList.add("on");
+  S.name=cellVal("name"); S.age=cellVal("age"); S.school=cellVal("school");
+  toast("Hello, "+S.name+"!");
+  /* Speak AFTER the screen change, so go()'s voice-stop does not cut
+     the greeting off. */
+  setTimeout(function(){ go("s-avatar"); speak("Hello, "+S.name+"! Let's make your Globatar!"); },650);
+});
+/* Placeholder label behaviour: the Name / Age / School word inside a
+   box is its placeholder. Clicking / tapping / focusing a box must NOT
+   hide it — it stays fully visible while the box is empty (the input
+   sits transparently on top of it, so the child still sees which box
+   is which). The label swaps to the empty box ONLY when a character
+   has actually been typed, and it comes straight back if the box is
+   cleared again. */
+function syncCellLabel(c){
+  var inp=c.querySelector("input");
+  var has=inp.value.length>0;
+  c.classList.toggle("has-text",has);
+  c.querySelector(".lbl").style.display=has?"none":"block";
+  c.querySelector(".emp").style.display=has?"block":"none";
+}
+cells.forEach(function(c){
+  c.addEventListener("click",function(){
+    c.classList.add("editing"); c.classList.remove("missing");
+    syncCellLabel(c);
+    var inp=c.querySelector("input"); inp.focus();
+  });
+  var inp=c.querySelector("input");
+  inp.addEventListener("focus",function(){
+    c.classList.add("editing"); c.classList.remove("missing");
+    syncCellLabel(c);
+  });
+});
+["in-name","in-age","in-school"].forEach(function(id){
+  $(id).addEventListener("input",function(){
+    syncCellLabel($(id).parentElement);
+    var all=["name","age","school"].every(function(f){ return !!cellVal(f); });
+    $("ackRow").classList.toggle("pulse", all && !ackChecked);
+    if(!all){ ackChecked=false; $("ackRow").classList.remove("on"); }
+  });
+});
+/* ================= 2. AVATAR =================
+   BUYER'S MATERIAL ONLY — nothing is invented or redrawn:
+   - The character picture is ALWAYS the buyer's own artwork
+     (char-*.png), with its own hair and outfit exactly as he drew
+     them. It is never swapped for an edited "bald" base and no
+     garment or hairstyle is ever drawn over it, so an old outfit
+     or old hair can never show through under a new one.
+   - HAIR / ACCESSORIES / ADVENTURE: the buyer listed these options
+     but gave NO wearable artwork for them (his hair image file was
+     blank). Their cells therefore stay BLACK / Locked (see
+     lockedNamed) — no demo hair, no made-up outfit, no drawn
+     accessory is shipped.
+   - What the buyer DID give is used exactly as given: his 4
+     characters, his 12 eye and 12 skin variations.
+   - OUTFITS: the buyer's 9 individual outfit sets are composited
+     onto the character at build time (assets/char-<char>-outfit-
+     n<1..9>.png): the character's original clothes AND shoes are
+     erased from those copies first and the set is drawn on the
+     body in their place, so a picked set fully REPLACES the
+     original outfit — it never layers on top of it, and only one
+     outfit is ever visible. With no set picked, the character
+     keeps the clothes in the buyer's own artwork.
+   - SHOES: the buyer has now sent the shoes as SEPARATE left/right
+     files (shoe_01..22 in assets). Each pair is composited onto the
+     character at build time (assets/char-<char>-shoe-<pair>.png):
+     the character's original shoes are erased from those copies
+     first and the new left+right shoes are drawn on the feet in
+     their place, so a picked pair fully REPLACES the original
+     shoes — it never layers on top of them. With no pair picked,
+     the character keeps the shoes in the buyer's own artwork. */
+var TABS=[
+  {id:"gender",color:"#43C91E",panel:"#F2FBEA"},
+  {id:"skin",color:"#FFC400",panel:"#FFFDF0"},
+  {id:"hair",color:"#8B5A2B",panel:"#FBF3E4"},
+  {id:"makeup",color:"#FF8A00",panel:"#FFF6EA"},
+  {id:"eyes",color:"#B04DF0",panel:"#F7F0FE"},
+  {id:"accessories",color:"#1293F5",panel:"#EBF6FF"},
+  {id:"adventure",color:"#E8910F",panel:"#FFF7E6"}
+];
+var curTab="eyes", selEye=4, selSkin=2;
+var CHARS={
+  boy:{src:"assets/char-boy.png",label:"A boy explorer!"},
+  girl:{src:"assets/char-girl.png",label:"A girl explorer!"},
+  safari:{src:"assets/char-safari.png",label:"A safari explorer!"},
+  bow:{src:"assets/char-bow.png",label:"A happy explorer!"}
+};
+var CHAR_ORDER=["boy","girl","safari","bow"];
+var EYE_POS={
+  boy:{ar:685/863,w:12.0,L:{cx:48.83,cy:50.98},R:{cx:80.51,cy:50.98}},
+  girl:{ar:574/690,w:9.9,L:{cx:54.27,cy:53.48},R:{cx:81.10,cy:50.29}},
+  safari:{ar:631/744,w:12.6,L:{cx:45.15,cy:47.90},R:{cx:75.52,cy:45.20}},
+  bow:{ar:598/752,w:10.6,L:{cx:42.81,cy:48.07},R:{cx:68.23,cy:49.14}}
+};
+var MASK_SCALE=1.14;
+var SKIN_TONE={boy:"#FEE6D3",girl:"#FFE3CB",safari:"#C38A6D",bow:"#B98669"};
+var IMG_AR={boy:685/863,girl:574/690,safari:631/744,bow:598/752};
+/* ---- skin tones: the buyer's own 12 tones, sampled from the exact
+   centre of his skin-01..12 head swatches. A tone is applied by
+   recolouring ONLY the character's skin pixels on a canvas (see
+   recolorSkin below): each skin pixel is scaled from the character's
+   own base tone to the picked tone, shading included. Hair, eyes,
+   clothes, shoes and outlines are NEVER touched, so the character
+   can never look bleached or foggy. The old approach — a CSS
+   brightness/saturate/hue-rotate filter over the WHOLE character
+   image — washed out the hair, shirt, pants and shoes along with
+   the skin (the "light lost / hazy" bug), and is gone for good. ---- */
+var SKIN_TONES=[[255,255,255],[254,230,211],[253,210,175],[232,167,117],[180,123,69],[174,94,76],[125,81,78],[78,18,14],[255,196,206],[178,255,255],[182,255,152],[255,255,174]];
+var BASE_SKIN={boy:[254,230,211],girl:[254,230,211],safari:[195,138,109],bow:[185,134,105]};
+var skinCache={};
+function recolorSkin(g,tone,cb){
+  var src=charSrc(g);
+  var key=src+"|"+tone;
+  if(skinCache[key]){ cb(skinCache[key]); return; }
+  var base=BASE_SKIN[g], tgt=SKIN_TONES[tone-1];
+  if(!base||!tgt||(base[0]===tgt[0]&&base[1]===tgt[1]&&base[2]===tgt[2])){ cb(src); return; }
+  var im=new Image();
+  im.onload=function(){
+    try{
+      var cv=document.createElement("canvas"); cv.width=im.naturalWidth; cv.height=im.naturalHeight;
+      var cx=cv.getContext("2d"); cx.drawImage(im,0,0);
+      var id=cx.getImageData(0,0,cv.width,cv.height), px=id.data;
+      var kr=tgt[0]/base[0], kg=tgt[1]/base[1], kb=tgt[2]/base[2];
+      for(var i=0;i<px.length;i+=4){
+        if(px[i+3]<200) continue;
+        var r=px[i],gc=px[i+1],b=px[i+2];
+        if(Math.max(r,gc,b)-Math.min(r,gc,b)<20) continue; /* white shirt, eye whites, black outline */
+        var rr=r/base[0], rg=gc/base[1], rb=b/base[2];
+        var hi=Math.max(rr,rg,rb), lo=Math.min(rr,rg,rb);
+        if(hi>1.03||lo<0.4||hi/lo>1.15) continue; /* not this character's skin family */
+        px[i]=Math.min(255,r*kr); px[i+1]=Math.min(255,gc*kg); px[i+2]=Math.min(255,b*kb);
+      }
+      cx.putImageData(id,0,0);
+      skinCache[key]=cv.toDataURL("image/png");
+      cb(skinCache[key]);
+    }catch(e){ cb(src); }
+  };
+  im.onerror=function(){ cb(src); };
+  im.src=src;
+}
+/* ---- shoes: the buyer's own pairs, cropped from his shoe sheet
+   (7A1F4DC3) with the sheet background knocked out. Width is computed
+   per character + per pair so the pair lands exactly on the feet at
+   the right height, its bottom on the character's foot line. ---- */
+var SHOE_DIM={sneakers:{ar:397/188,h:11.5},dress:{ar:423/189,h:11.5},slippers:{ar:415/159,h:10.5},flipflops:{ar:410/131,h:8.5}};
+var FEET={boy:{cx:53,b:0.4},girl:{cx:62,b:0.4},safari:{cx:55,b:0.4},bow:{cx:57,b:-6.5}};
+var HAIR_OPTS=[{id:"long",name:"Long straight"},{id:"short",name:"Short"},{id:"afro",name:"Afro"},{id:"pony",name:"Pony tail"}];
+var SHOE_OPTS=[{id:"sneakers",name:"Colorful sneakers"},{id:"flipflops",name:"Flip flops"},{id:"slippers",name:"Slippers"},{id:"dress",name:"Dress shoes"}];
+var ACC_OPTS=[{id:"sunglasses",name:"Sunglasses"},{id:"earrings",name:"Earrings"},{id:"necklace",name:"Necklace"},{id:"watch",name:"Watch"}];
+var ADV_OPTS=[{id:"hat",name:"Safari explorer hat"},{id:"binoculars",name:"Binoculars"},{id:"camera",name:"Safari camera"},{id:"compass",name:"Explorer compass"}];
+/* ---- shoes: the buyer's 11 pairs, sent as individual left/right
+   files (shoe_01..22). pair-<id>.png is the pair shown in a grid
+   cell; char-<char>-shoe-<id>.png is the character wearing that
+   pair with its original shoes removed (see the note above). ---- */
+/* ---- outfits (PDF §3: "more detailed attire") ----
+   ONE selection state drives everything: S.cloth holds the ONE
+   outfit set the Globatar is wearing ("" = his own original
+   clothes, "n1".."n9" = one of the buyer's 9 individual sets).
+   The purple ring and the clothes on the character BOTH read
+   S.cloth and nothing else, so two cells can never look selected
+   at once and the ring always marks the outfit actually worn.
+   (The old code kept a second state, S.outfitPick, for the grid
+   ring while S.cloth drove the wearing — tapping a type updated
+   one and not the other, leaving two rings lit and the character
+   unchanged. That split state is gone for good.)
+   The buyer's 4 outfit types (T-shirt / Dress / Skirt / Jeans,
+   cloth-*-ref.png) are PICTURES OF his individual sets — the
+   T-shirt cell shows the lightning set, Dress the plaid-skirt
+   set, Skirt the pastel-jacket set, Jeans the navy set — so each
+   type cell simply wears its matching set (t.set) through the
+   same composited-image path as the grid cells. The old type
+   behaviour — laying an unrelated flat graphic (outfit-boy/girl/
+   safari/bow.png) over the torso at a guessed position, half on
+   and half off the original clothes — is removed: a tap now
+   changes the character's whole outfit, originals fully gone. */
+var OUTFIT_TYPES=[
+  {id:"tshirt",name:"T-shirt",ref:"assets/cloth-tshirt-ref.png",set:"n8"},
+  {id:"dress",name:"Dress",ref:"assets/cloth-dress-ref.png",set:"n9"},
+  {id:"skirt",name:"Skirt",ref:"assets/cloth-skirt-ref.png",set:"n2"},
+  {id:"jeans",name:"Jeans",ref:"assets/cloth-jeans-ref.png",set:"n1"}
+];
+/* The buyer's 9 individual outfit sets (outfits_individual.zip,
+   2026-11-21): each file is a COMPLETE set — top, bottom AND its
+   own shoes / boots / socks — drawn on transparency in the same
+   order as his 12-outfit grid, so grid outfits 1-9 are exactly
+   these files. A set is NEVER drawn over the character: each one
+   is composited into its own copy of every character
+   (assets/char-<char>-outfit-n<1..9>.png) with the character's
+   original clothes and shoes erased first and the set fitted to
+   the body in their place, the same build-time compositing as
+   the shoe pairs — so wearing a set REPLACES the old outfit
+   completely and only one outfit is ever visible. (Grid outfits
+   10-12 still exist only as small grid thumbnails; tapping one
+   says exactly which file is needed to wear it.) */
+var NEW_OUTFITS=[
+  {id:"n1",name:"Navy tee and blue shorts",src:"assets/outfit_01_navy_tee_blue_shorts.png"},
+  {id:"n2",name:"Pastel jacket and purple shoes",src:"assets/outfit_02_pastel_jacket_purple_shoes.png"},
+  {id:"n3",name:"Camo jacket and green shoes",src:"assets/outfit_03_camo_jacket_green_shoes.png"},
+  {id:"n4",name:"Navy chick sweater and yellow socks",src:"assets/outfit_04_navy_chick_sweater_yellow_socks.png"},
+  {id:"n5",name:"Yellow hoodie and red boots",src:"assets/outfit_05_yellow_hoodie_red_boots.png"},
+  {id:"n6",name:"Frog sweater and green shoes",src:"assets/outfit_06_frog_sweater_green_shoes.png"},
+  {id:"n7",name:"Pink jacket and red boots",src:"assets/outfit_07_pink_jacket_red_boots.png"},
+  {id:"n8",name:"Lightning tee and blue shorts",src:"assets/outfit_08_lightning_tee_blue_shorts.png"},
+  {id:"n9",name:"Blue jacket and plaid skirt",src:"assets/outfit_09_blue_jacket_plaid_skirt.png"}
+];
+function setOutfit(id){
+  /* Outfit option removed — the character always keeps its
+     original clothes. This stays only so no stale caller can
+     ever put a composited outfit back on. */
+  S.cloth="";
+  applyLook();
+}
+var SHOE_PAIRS=[
+  {id:"blue",name:"Blue shoes"},{id:"green",name:"Green shoes"},
+  {id:"greyorange",name:"Grey and orange shoes"},{id:"black",name:"Black shoes"},
+  {id:"white",name:"White shoes"},{id:"yellow",name:"Yellow shoes"},
+  {id:"bunny",name:"Bunny slippers"},{id:"pink",name:"Pink shoes"},
+  {id:"tiedye",name:"Tie-dye shoes"},{id:"slide",name:"Slides"},
+  {id:"brown",name:"Brown shoes"}
+];
+/* A worn individual outfit SET is a complete head-to-shoes set
+   with its OWN footwear, so while one is worn the character
+   stands in its composited outfit image (see charSrc): the set's
+   footwear is the only shoe layer there is — a separately picked
+   pair can never hide underneath it or poke out around its
+   boots. Taking the set off brings the picked pair back,
+   untouched. */
+function wearingFullSet(){ return false; }
+function effShoes(){ return ""; }
+function charSrc(g){
+  /* Outfit and Shoes options are REMOVED for this delivery: every
+     character always stands in its ORIGINAL outfit and ORIGINAL
+     shoes, exactly as the buyer drew it (CHARS[g].src) — no
+     composited outfit copy, no shoe copy, no overlay, nothing
+     left over from the outfit/shoes work. */
+  return CHARS[g].src;
+}
+function setShoes(id){
+  /* Shoes option removed — the character always keeps its
+     original shoes. This stays only so no stale caller can
+     ever put a composited pair back on. */
+  S.shoes="";
+  applyLook();
+}
+function buildTabs(){
+  var w=$("avatarTabs"); w.innerHTML="";
+  TABS.forEach(function(t){
+    var b=document.createElement("button"); b.className="tab"+(t.id===curTab?" sel":""); b.setAttribute("aria-label",t.id);
+    b.innerHTML='<img class="shape" src="assets/tab-'+t.id+'.png" alt=""><img class="icon" src="assets/icon-'+t.id+'.png" alt="">';
+    b.addEventListener("click",function(){ curTab=t.id; buildTabs(); buildGrid(); });
+    w.appendChild(b);
+  });
+}
+function cellEl(inner,sel,selCls){
+  var d=document.createElement("button"); d.className="gcell"+(sel?" "+(selCls||"sel"):""); d.innerHTML=inner; return d;
+}
+function optCell(inner,label,selected,onPick){
+  var d=cellEl(inner+'<span class="opt-label">'+label+'</span>', selected);
+  d.classList.add("pickable");
+  d.addEventListener("click",function(){ onPick(); buildGrid(); });
+  return d;
+}
+function lockedCells(g,n){
+  for(var k=0;k<n;k++)(function(){
+    var d=document.createElement("button"); d.className="gcell locked";
+    d.innerHTML='<span class="blurcirc"></span><span class="locktag">Coming soon</span>';
+    d.addEventListener("click",function(){ toast("Coming soon! Pick a glowing one!"); speak("That one is coming soon. Pick a glowing one!"); });
+    g.appendChild(d);
+  })();
+}
+/* Options the buyer LISTED but gave NO artwork for: the cell shows
+   his option name over a BLACK, empty swatch and stays Locked.
+   Nothing is drawn, guessed or demoed for these. */
+function lockedNamed(g,opts){
+  opts.forEach(function(o){
+    var d=document.createElement("button"); d.className="gcell locked";
+    d.innerHTML='<span class="blacksw"></span><span class="opt-label">'+o.name+'</span><span class="locktag" style="bottom:auto;top:4%">Coming soon</span>';
+    d.addEventListener("click",function(){ toast("Coming soon! Pick a glowing one!"); speak("That one is coming soon. Pick a glowing one!"); });
+    g.appendChild(d);
+  });
+}
+/* ---- celebrate: a short happy jump / spin / wave on EVERY change,
+   so the character shows off the new look. No buttons, no UI. ---- */
+var celTimer=null;
+function celebrate(){
+  var cls=["cel-jump","cel-spin","cel-wave"][Math.floor(Math.random()*3)];
+  ["charStage","passportStage"].forEach(function(id){
+    var el=$(id); if(!el) return;
+    el.classList.remove("cel-jump","cel-spin","cel-wave"); void el.offsetWidth; el.classList.add(cls);
+  });
+  clearTimeout(celTimer);
+  celTimer=setTimeout(function(){
+    ["charStage","passportStage"].forEach(function(id){ var el=$(id); if(el) el.classList.remove("cel-jump","cel-spin","cel-wave"); });
+  },820);
+}
+/* ---- rendering: the Avatar stage shows the Globatar. Every
+   overlay's content is REPLACED. ---- */
+function setOv(root,role,css,html){
+  var el=root.querySelector('[data-role="'+role+'"]'); if(!el) return;
+  if(html){ el.style.cssText=css+";z-index:"+(role==="adv"?5:role==="acc"?4:3); el.innerHTML=html; el.classList.add("on"); }
+  else { el.innerHTML=""; el.classList.remove("on"); el.style.cssText="z-index:"+(role==="adv"?5:role==="acc"?4:3); }
+}
+function renderStage(root){
+  var g=S.gender, p=EYE_POS[g]||EYE_POS.boy;
+  var img=root.querySelector('[data-role="char"]');
+  img.style.filter = "";
+  /* Skin tone recolours ONLY the skin (see recolorSkin): the src is
+     swapped for a canvas copy whose hair, clothes and shoes are
+     pixel-identical to the buyer's artwork. No filter ever touches
+     the whole character again. */
+  var sh=S.shoes, cl=S.cloth;
+  recolorSkin(g,selSkin,function(src){ if(S.gender===g&&S.shoes===sh&&S.cloth===cl) img.src=src; });
+  /* eyes: erase old iris with the sclera patch, then draw only the new one */
+  var ov=root.querySelector('[data-role="eyes"]');
+  var f="assets/iris-"+(selEye<10?"0":"")+selEye+".png";
+  var irisH=p.w*p.ar*(142/120);
+  [["eyeL","maskL",p.L],["eyeR","maskR",p.R]].forEach(function(trio){
+    var im=root.querySelector('[data-role="'+trio[0]+'"]'), mk=root.querySelector('[data-role="'+trio[1]+'"]'), q=trio[2];
+    mk.style.left=q.cx+"%"; mk.style.top=q.cy+"%";
+    mk.style.width=(p.w*MASK_SCALE)+"%"; mk.style.height=(irisH*MASK_SCALE)+"%";
+    im.src=f; im.style.left=q.cx+"%"; im.style.top=q.cy+"%"; im.style.width=p.w+"%";
+  });
+  ov.classList.add("on");
+  /* hair: NOTHING is drawn over the character — the buyer gave no
+     wearable hair artwork, so the character keeps its own hair
+     exactly as he drew it. No layering, no old-under-new, ever.
+     outfit: NOTHING is ever drawn over the character. The worn
+     set is already IN the character image (charSrc swaps in the
+     composited copy whose original clothes were erased), so a
+     second outfit can never appear over the first and the old
+     outfit is fully gone the moment a new one is tapped. The
+     cloth overlay therefore stays empty on every render; with
+     no outfit picked the character keeps the clothes in his own
+     artwork, and tapping the worn outfit again takes it off and
+     returns those original clothes. */
+  setOv(root,"hair","","");
+  setOv(root,"cloth","","");
+  /* shoes: no overlay is used — the picked pair is already ON the
+     character image itself (charSrc above swaps in the composited
+     copy whose original shoes were removed), so nothing can ever
+     layer over the old shoes. */
+  setOv(root,"shoe","","");
+  /* accessories + adventure: no artwork was given for these either,
+     so their overlays always stay empty. */
+  setOv(root,"acc","",""); setOv(root,"adv","","");
+}
+function syncAdvBadges(){
+  var html="";
+  ["advBadgeLesson","advBadgeGame"].forEach(function(id){ var el=$(id); if(!el) return; el.innerHTML=html; el.classList.toggle("on",!!html); });
+}
+function applyLook(){
+  /* The same live Globatar renders in BOTH places: the Avatar stage
+     and the photo box of the Globi Passport. renderStage recolours
+     only the skin and swaps only the iris, so the passport photo
+     always shows the character / eyes / skin the child picked. */
+  [$("charStage"),$("passportStage"),$("homeStage"),$("mapStage")].forEach(function(r){ if(r) renderStage(r); });
+  syncAdvBadges();
+}
+function applyEyes(){ applyLook(); }
+function applySkin(){ applyLook(); }
+function isGirlChar(id){ return id==="girl"||id==="bow"; }
+/* ---- Gender (Boy/Girl) is its OWN choice, kept separate from the
+   character pick so it can be changed on the Avatar screen AND on
+   the Passport, with both always in sync:
+   - updateGenderUI() redraws every gender display from
+     S.genderSel: the Avatar Boy/Girl pills and the Passport pill.
+   - Picking a character (the gender tab's 4 Globatars) also sets
+     S.genderSel from that character, so the Passport follows.
+   - Picking Boy/Girl itself only SUGGESTS a character: it swaps
+     the Globatar only when the current one is for the other
+     gender; a character that already fits the picked gender is
+     kept exactly as chosen. ---- */
+function updateGenderUI(){
+  var girl=S.genderSel==="girl";
+  var bB=$("genderBoyBtn"), bG=$("genderGirlBtn");
+  if(bB) bB.classList.toggle("sel",!girl);
+  if(bG) bG.classList.toggle("sel",girl);
+  var sym=$("ppGenderSym"), txt=$("ppGender");
+  if(sym) sym.innerHTML=girl?"&#9792;":"&#9794;";
+  if(txt) txt.textContent=girl?"Girl":"Boy";
+}
+function setGender(gd){
+  S.gender=gd;
+  S.genderSel=isGirlChar(gd)?"girl":"boy";
+  applyLook(); updateGenderUI();
+  speak(CHARS[gd].label);
+}
+function setGenderChoice(sel){
+  if(S.genderSel===sel){ updateGenderUI(); return; }
+  S.genderSel=sel;
+  /* Follow the new gender with a character suggestion ONLY when
+     the current Globatar is for the other gender — otherwise the
+     child's chosen character stays untouched. */
+  if(sel==="girl" && !isGirlChar(S.gender)) S.gender="girl";
+  if(sel==="boy" && isGirlChar(S.gender)) S.gender="boy";
+  applyLook(); updateGenderUI();
+  if(typeof buildGrid==="function" && curTab==="gender") buildGrid();
+  if(typeof buildPassportGrid==="function" && typeof ppCurTab!=="undefined" && ppCurTab==="gender") buildPassportGrid();
+  celebrate();
+  speak(sel==="girl"?"Girl!":"Boy!");
+}
+function buildGrid(){
+  var g=$("avatarGrid"); g.innerHTML="";
+  var tab=TABS.filter(function(t){return t.id===curTab;})[0];
+  $("avatarPanel").style.background=tab.panel;
+  $("avatarPanel").style.border=".7cqw solid "+tab.color;
+  /* There is NO text under the outfit grid — the panel holds the
+     grid and nothing else. The Outfit panel grows taller so all
+     four rows fit inside it. Every tab sets EXPLICIT equal rows
+     below: with implicit rows the 25-cell outfit grid collapsed
+     and its images spilled over each other. */
+  $("avatarPanel").style.height = "60%";
+  g.style.gridTemplateRows="";
+  var i, d;
+  if(curTab==="gender"){
+    g.style.gridTemplateColumns="repeat(2,1fr)";
+    g.style.gridTemplateRows="repeat(2,1fr)";
+    CHAR_ORDER.forEach(function(id){
+      d=cellEl('<img src="'+CHARS[id].src+'" style="height:94%;width:auto;max-width:94%" alt="">', S.gender===id, "selY");
+      d.addEventListener("click",function(){ setGender(id); celebrate(); buildGrid(); });
+      g.appendChild(d);
+    });
+    return;
+  }
+  if(curTab==="hair"){
+    /* The buyer listed Long straight / Short / Afro / Pony tail, but
+       his hair image file was blank — no hair artwork was given.
+       The cells stay BLACK and Locked; no hair is drawn or guessed,
+       and the character keeps its own hair. */
+    g.style.gridTemplateColumns="repeat(4,1fr)";
+    g.style.gridTemplateRows="repeat(2,1fr)";
+    lockedNamed(g,HAIR_OPTS);
+    lockedCells(g,4);
+    return;
+  }
+  if(curTab==="accessories"){
+    /* Sunglasses / Earrings / Necklace / Watch were listed, but the
+       buyer gave NO images for them: BLACK, Locked, nothing drawn. */
+    g.style.gridTemplateColumns="repeat(4,1fr)";
+    g.style.gridTemplateRows="repeat(2,1fr)";
+    lockedNamed(g,ACC_OPTS);
+    lockedCells(g,4);
+    return;
+  }
+  if(curTab==="adventure"){
+    /* Safari hat / Binoculars / Camera / Compass were listed, but
+       the buyer gave NO images for them: BLACK, Locked, nothing
+       drawn. */
+    g.style.gridTemplateColumns="repeat(4,1fr)";
+    g.style.gridTemplateRows="repeat(2,1fr)";
+    lockedNamed(g,ADV_OPTS);
+    lockedCells(g,4);
+    return;
+  }
+  if(curTab==="makeup"){
+    /* Makeup: the buyer gave NO makeup list and NO makeup images, so
+       nothing is invented here — the tab stays "Coming soon!". */
+    g.style.gridTemplateColumns="repeat(1,1fr)";
+    g.style.gridTemplateRows="repeat(1,1fr)";
+    var note=document.createElement("div");
+    note.style.cssText="display:flex;align-items:center;justify-content:center;text-align:center;font-size:3.8cqw;color:#B3541E;padding:2cqw";
+    note.textContent="Coming soon!";
+    g.appendChild(note);
+    return;
+  }
+  g.style.gridTemplateColumns="repeat(4,1fr)";
+  g.style.gridTemplateRows="repeat(3,1fr)";
+  if(curTab==="skin"){
+    for(i=1;i<=12;i++)(function(n){
+      d=cellEl('<img src="assets/skin-'+(n<10?"0":"")+n+'.png" alt="">', n===selSkin, "selY");
+      d.addEventListener("click",function(){ selSkin=n; applySkin(); celebrate(); buildGrid(); });
+      g.appendChild(d);
+    })(i);
+  } else if(curTab==="eyes"){
+    for(i=1;i<=12;i++)(function(n){
+      d=cellEl('<img src="assets/eye-'+(n<10?"0":"")+n+'.png" alt="">', n===selEye);
+      d.addEventListener("click",function(){ selEye=n; applyEyes(); celebrate(); buildGrid(); speak("Pretty eyes!"); });
+      g.appendChild(d);
+    })(i);
+  }
+}
+buildTabs(); buildGrid(); applyLook(); updateGenderUI();
+$("genderBoyBtn").addEventListener("click",function(){ setGenderChoice("boy"); });
+$("genderGirlBtn").addEventListener("click",function(){ setGenderChoice("girl"); });
+$("btnConfirm").addEventListener("click",function(){
+  go("s-home");
+  speak("You look great, "+(S.name||"explorer")+"! Let's explore the world!");
+});
+/* ================= 0. WELCOME + HOME WORLD MAP (PDF §2 + §4) ====== */
+$("btnStart").addEventListener("click",function(){
+  go("s-login");
+  speak("Welcome to Globi! First, tell us your name!");
+});
+$("homeStage").addEventListener("click",function(){ go("s-avatar"); });
+/* Spin the globe: the Africa marker and its glow turn a full circle
+   while the continent labels light up one by one — Asia, Europe,
+   North America, South America, Australia, Antarctica — and land
+   back on Africa, the first destination. Triggered by dragging the
+   globe sideways or by tapping a locked continent chip. */
+var globeSpinning=false;
+function spinGlobe(){
+  if(globeSpinning) return;
+  globeSpinning=true;
+  var af=$("homeAfrica"), gl=$("homeGlow");
+  [af,gl].forEach(function(el){ el.classList.remove("spinning"); void el.offsetWidth; el.classList.add("spinning"); });
+  var order=["Asia","Europe","North America","South America","Australia","Antarctica","Africa"], step=0;
+  var chips=document.querySelectorAll(".cont-chip");
+  var iv=setInterval(function(){
+    chips.forEach(function(c){ c.classList.toggle("hl", c.getAttribute("data-cont")===order[step]); });
+    speak(order[step]+"!");
+    step++;
+    if(step>=order.length){
+      clearInterval(iv);
+      chips.forEach(function(c){ c.classList.remove("hl"); });
+      [af,gl].forEach(function(el){ el.classList.remove("spinning"); });
+      globeSpinning=false;
+      toast("Africa is first! Tap Africa to play!");
+    }
+  },340);
+}
+document.querySelectorAll(".cont-chip").forEach(function(c){
+  c.addEventListener("click",function(){
+    var n=c.getAttribute("data-cont");
+    if(n==="Africa"){ go("s-map"); speak("Africa! Find Africa on the world map!"); return; }
+    c.classList.remove("shake"); void c.offsetWidth; c.classList.add("shake");
+    toast(n+" is locked — finish Kenya first!");
+    speak(n+" is locked. Finish Kenya first!");
+    spinGlobe();
+  });
+});
+/* Dragging the globe sideways spins it; a plain tap still opens
+   Africa exactly as before. */
+var globeDragX=null, globeDragged=false;
+$("africaHit").addEventListener("pointerdown",function(e){ globeDragX=e.clientX; globeDragged=false; });
+$("africaHit").addEventListener("pointerup",function(e){
+  if(globeDragX!==null && Math.abs(e.clientX-globeDragX)>45){ globeDragged=true; spinGlobe(); setTimeout(function(){ globeDragged=false; },80); }
+  globeDragX=null;
+});
+
+/* ================= 3B. GLOBI PASSPORT =================
+   The yellow profile button on Home opens this page — NOT the
+   log-in form. The page is the buyer's own passport image; the
+   live parts filled from S when the page opens are the Globatar
+   photo (the character / eyes / skin picked in Avatar), the name
+   typed at log-in in his Name pill, and the gender in his Gender
+   pill. Nothing is copied from his sample values: if the name was
+   left empty it stays empty, and no name is ever invented.
+   Status "Globi Jr.", Passport No. GLOBI-001 and Nationality
+   "Globian" are read from his image itself, exactly as he drew
+   them. */
+var ppCurTab="eyes";
+/* The passport's baked tab row is: Character, Skin, Hair,
+   Makeup, Eyes, Shoes (boot), Adventure. The Shoes option is
+   REMOVED for this delivery, so its hit-area (index 5) is
+   disabled — PP_TABS holds null there, keeping every other
+   tab aligned over its own baked icon, and the boot tab can
+   never open a Shoes grid or change the original shoes. */
+var PP_TABS=["gender","skin","hair","makeup","eyes",null,"adventure"];
+function buildPassportTabs(){
+  var wrap=$("ppTabs"); if(!wrap) return;
+  var tabs=wrap.querySelectorAll(".pp-tab");
+  tabs.forEach(function(el,idx){
+    var tid=PP_TABS[idx];
+    if(!tid){ el.classList.remove("sel"); el.style.pointerEvents="none"; el.removeAttribute("tabindex"); el.removeAttribute("role"); return; }
+    el.classList.toggle("sel", tid===ppCurTab);
+    if(!el._ppBound){
+      el._ppBound=true;
+      el.setAttribute("role","button");
+      el.setAttribute("tabindex","0");
+      el.addEventListener("click",function(){
+        var all=wrap.querySelectorAll(".pp-tab");
+        var i=Array.prototype.indexOf.call(all, el);
+        var tid=PP_TABS[i]; if(!tid) return;
+        ppCurTab=tid;
+        buildPassportTabs();
+        buildPassportGrid();
+      });
+    }
+  });
+}
+/* The clean panel behind the Passport grid takes the CURRENT
+   tab's own Avatar-panel colours, exactly like the Avatar
+   screen's panel, and is fully opaque — so whichever tab is
+   open, the grid sits on this panel alone and the eye grid
+   baked into the buyer's passport image stays completely
+   covered behind it. No other tab's image can show through. */
+function ppPanelFor(tabId){
+  var p=$("ppGridPanel"); if(!p) return;
+  var t=TABS.filter(function(x){return x.id===tabId;})[0];
+  if(!t) return;
+  p.style.background=t.panel;
+  p.style.borderColor=t.color;
+}
+function buildPassportEyes(){
+  var g=$("ppEyeGrid"); if(!g) return; g.innerHTML="";
+  ppPanelFor("eyes");
+  g.style.gridTemplateColumns="repeat(4,1fr)";
+  g.style.gridTemplateRows="repeat(3,1fr)";
+  for(var i=1;i<=12;i++)(function(n){
+    var d=document.createElement("button");
+    d.className="pp-eye vis"+(n===selEye?" sel":"");
+    d.setAttribute("aria-label","Eye colour "+n);
+    /* The eye cells are drawn LIVE on the clean panel (the
+       buyer's own eye-*.png artwork, on the same pale-cyan cell
+       as his design) — they no longer rely on his baked eye
+       grid showing through, so that baked grid can stay covered
+       by the panel on every tab and only the LIVE purple
+       selection ring marks the one picked cell. */
+    d.innerHTML='<img src="assets/eye-'+(n<10?"0":"")+n+'.png" alt="">';
+    d.addEventListener("click",function(){ selEye=n; applyEyes(); celebrate(); buildPassportEyes(); buildGrid(); speak("Pretty eyes!"); });
+    g.appendChild(d);
+  })(i);
+}
+function buildPassportGrid(){
+  var g=$("ppEyeGrid"); if(!g) return;
+  if(ppCurTab==="eyes"){ buildPassportEyes(); return; }
+  /* Every non-eye tab also sits on the clean opaque panel in
+     its own colours — only its own cells show, nothing behind. */
+  ppPanelFor(ppCurTab);
+  g.innerHTML="";
+  var i,d;
+  if(ppCurTab==="gender"){
+    g.style.gridTemplateColumns="repeat(2,1fr)";
+    g.style.gridTemplateRows="repeat(2,1fr)";
+    CHAR_ORDER.forEach(function(id){
+      var dd=document.createElement("button");
+      dd.className="pp-eye vis"+(S.gender===id?" sel":"");
+      dd.innerHTML='<img src="'+CHARS[id].src+'" style="height:92%;width:auto;max-width:92%" alt="">';
+      dd.addEventListener("click",function(){ setGender(id); celebrate(); buildPassportGrid(); buildGrid(); var ig=(id==="girl"||id==="bow"); $("ppGenderSym").innerHTML=ig?"&#9792;":"&#9794;"; $("ppGender").textContent=ig?"Girl":"Boy"; });
+      g.appendChild(dd);
+    });
+    return;
+  }
+  if(ppCurTab==="skin"){
+    g.style.gridTemplateColumns="repeat(4,1fr)";
+    g.style.gridTemplateRows="repeat(3,1fr)";
+    for(i=1;i<=12;i++)(function(n){
+      var dd=document.createElement("button");
+      dd.className="pp-eye vis"+(n===selSkin?" sel":"");
+      dd.setAttribute("aria-label","Skin tone "+n);
+      dd.innerHTML='<img src="assets/skin-'+(n<10?"0":"")+n+'.png" alt="">';
+      dd.addEventListener("click",function(){ selSkin=n; applySkin(); celebrate(); buildPassportGrid(); buildGrid(); });
+      g.appendChild(dd);
+    })(i);
+    return;
+  }
+  if(ppCurTab==="hair"||ppCurTab==="accessories"||ppCurTab==="adventure"){
+    g.style.gridTemplateColumns="repeat(4,1fr)";
+    g.style.gridTemplateRows="repeat(2,1fr)";
+    var opts=ppCurTab==="hair"?HAIR_OPTS:(ppCurTab==="accessories"?ACC_OPTS:ADV_OPTS);
+    opts.forEach(function(o){
+      var dd=document.createElement("button");
+      dd.className="pp-eye vis"; dd.style.cursor="not-allowed"; dd.style.background="#EDEDED";
+      dd.innerHTML='<span style="position:absolute;left:50%;top:36%;transform:translate(-50%,-50%);width:58%;aspect-ratio:1.15;border-radius:1.2cqw;background:#151515;display:block"></span><span style="position:absolute;left:50%;bottom:6%;transform:translateX(-50%);font-size:1.35cqw;line-height:1.1;color:#0B2A7A;background:rgba(255,255,255,.92);border-radius:99px;padding:.15em .6em;white-space:nowrap">'+o.name+'</span>';
+      dd.addEventListener("click",function(){ toast("Coming soon! Pick a glowing one!"); speak("That one is coming soon. Pick a glowing one!"); });
+      g.appendChild(dd);
+    });
+    for(var k=0;k<4;k++)(function(){
+      var ld=document.createElement("button");
+      ld.className="pp-eye vis"; ld.style.cursor="not-allowed";
+      ld.innerHTML='<span style="position:absolute;left:50%;top:44%;transform:translate(-50%,-50%);width:58%;aspect-ratio:1;border-radius:50%;background:radial-gradient(circle at 35% 35%,#BFE3FF,#5EA9E6 60%,#2B6CB0);filter:blur(.55cqw);opacity:.75;display:block"></span><span style="position:absolute;left:50%;bottom:5%;transform:translateX(-50%);font-size:1.4cqw;color:#5B7A99;white-space:nowrap">Coming soon</span>';
+      ld.addEventListener("click",function(){ toast("Coming soon! Pick a glowing one!"); speak("That one is coming soon. Pick a glowing one!"); });
+      g.appendChild(ld);
+    })();
+    return;
+  }
+  if(ppCurTab==="makeup"){
+    g.style.gridTemplateColumns="repeat(1,1fr)";
+    g.style.gridTemplateRows="repeat(1,1fr)";
+    var note=document.createElement("div");
+    note.style.cssText="display:flex;align-items:center;justify-content:center;text-align:center;font-size:3.2cqw;color:#B3541E;padding:2cqw;background:rgba(255,255,255,.92);border-radius:1.4cqw;min-height:13cqw";
+    note.textContent="Coming soon!";
+    g.appendChild(note);
+    return;
+  }
+}
+function buildPassport(){
+  /* The buyer's passport image carries exactly five fields — Name,
+     Status, Gender, Passport No., Nationality — so the live values
+     go into his Name and Gender pills and his Status / Passport
+     No. / Nationality stay as he drew them in the image itself.
+     (School and Age have no field in his design and are not added:
+     nothing may be drawn on his passport that he did not draw.) */
+  $("ppName").textContent=S.name||"";
+  updateGenderUI();
+  ppCurTab="eyes";
+  buildPassportTabs();
+  buildPassportGrid();
+  applyLook();
+}
+$("btnPassport").addEventListener("click",function(){
+  go("s-passport");
+  speak("Your Globi Passport!");
+});
+/* Passport Gender pill is EDITABLE: tapping it switches Boy/Girl.
+   setGenderChoice keeps the Avatar Boy/Girl pills, the Avatar
+   character and the Home Globatar in sync with the change. */
+$("ppGenderPill").addEventListener("click",function(){
+  setGenderChoice(S.genderSel==="girl"?"boy":"girl");
+  toast("Gender: "+(S.genderSel==="girl"?"Girl":"Boy"));
+});
+$("ppGenderPill").addEventListener("keydown",function(e){
+  if(e.key==="Enter"||e.key===" "){ e.preventDefault(); setGenderChoice(S.genderSel==="girl"?"boy":"girl"); }
+});
+/* ================= 4. AFRICA ================= */
+$("africaHit").addEventListener("click",function(){
+  if(globeDragged) return; /* a sideways drag spun the globe instead */
+  go("s-map"); speak("Africa! Find Africa on the world map!");
+});
+/* ================= 3A. WORLD MAP =================
+   The flat labeled Map of the World (PDF §4 "What I want to
+   add"). The profile card is LIVE — the child's own Globatar,
+   name and star count, filled from S every time the page opens,
+   exactly like the Passport. Africa on the map enters the
+   Africa screen; every other continent is locked. */
+function buildMap(){
+  renderStage($("mapStage"));
+  $("mapProfName").textContent=S.name||"";
+  $("mapProfStars").textContent=S.stars;
+}
+$("mapAfricaHit").addEventListener("click",function(){
+  go("s-africa"); speak("Africa! Click on Kenya!");
+});
+$("kenyaHit").addEventListener("click",function(){ go("s-lesson"); resetLesson(); startKenyaIntro(); });
+document.querySelectorAll(".locked-land").forEach(function(b){
+  b.addEventListener("click",function(){
+    b.classList.remove("shake"); void b.offsetWidth; b.classList.add("shake");
+    var n=b.getAttribute("data-land");
+    toast(n+" is locked — finish Kenya first!"); speak(n+" is locked. Finish Kenya first!");
+  });
+});
+/* ================= 5. LESSON ================= */
+var lessonOn=false, seqTimers=[];
+function resetLesson(){
+  lessonOn=false; practice=null;
+  $("btnTri").style.display="block";
+  $("hotLayer").style.display="none";
+  $("kenyaIntro").classList.remove("on");
+  $("btnLessonPlay").classList.remove("pulse");
+  var lc=$("lessonChar"); lc.style.transition="none"; lc.style.transform=""; lc.classList.remove("walk-bob"); lc.classList.add("bob");
+  document.querySelectorAll(".hot").forEach(function(h){ h.classList.remove("lit","done","wrong"); });
+  seqTimers.forEach(clearTimeout); seqTimers=[];
+  kiTimers.forEach(clearTimeout); kiTimers=[];
+}
+var PHON={cat:"kuh, a, tuh. Cat!",bus:"buh, uh, ss. Bus!",mud:"muh, uh, duh. Mud!",fan:"fff, a, nn. Fan!",pig:"puh, i, guh. Pig!",top:"tuh, o, puh. Top!"};
+function lightWord(w){
+  document.querySelectorAll(".hot").forEach(function(h){ h.classList.toggle("lit", h.getAttribute("data-word")===w); });
+}
+/* ---- PDF §5: the Kenya video-style introduction ----
+   Plays right after Kenya is tapped, BEFORE the lesson: the
+   buyer's savanna artwork pans slowly like a video while four
+   fact cards appear one by one — Mount Kenya (landmark), the
+   animals, Lake Victoria (scenery) and Nairobi (capital) — each
+   read aloud. Skip ends it at once; the last card's "Let's
+   Learn!" button ends it too. Either way the safari friend then
+   WALKS a few steps into the scene (PDF §6) and the lesson
+   video plays by itself. */
+var KI_FACTS=[
+  "Welcome to Kenya! A beautiful country in Africa!",
+  "Mount Kenya is a giant mountain with snow on top!",
+  "Elephants, lions and giraffes live here!",
+  "Lake Victoria is one of the biggest lakes in the world, and Nairobi is Kenya's capital city!"
+];
+var kiTimers=[], kiStep=0;
+function kiShow(i){
+  kiStep=i;
+  $("kiCard").textContent=KI_FACTS[i];
+  var dots=$("kiDots").children;
+  for(var k=0;k<dots.length;k++) dots[k].classList.toggle("on", k===i);
+  $("kiGo").classList.toggle("on", i===KI_FACTS.length-1);
+  speak(KI_FACTS[i]);
+}
+function startKenyaIntro(){
+  var ov=$("kenyaIntro"); ov.classList.add("on");
+  kiTimers.forEach(clearTimeout); kiTimers=[];
+  kiShow(0);
+  for(var i=1;i<KI_FACTS.length;i++)(function(n){
+    kiTimers.push(setTimeout(function(){ if(ov.classList.contains("on")) kiShow(n); }, n*3400));
+  })(i);
+}
+function endKenyaIntro(){
+  kiTimers.forEach(clearTimeout); kiTimers=[];
+  $("kenyaIntro").classList.remove("on");
+  walkIn();
+}
+/* ---- PDF §6: walk a bit, then the lesson plays ----
+   The safari friend walks a few steps into the Kenya scene;
+   when he stops, the lesson "video" starts by itself — the same
+   sequence the board's green play button runs. */
+function walkIn(){
+  var lc=$("lessonChar");
+  lc.classList.remove("bob"); lc.classList.add("walk-bob");
+  lc.style.transition="transform 1.7s ease-in-out";
+  /* Only a few small steps: at translateX(52%) he slid 12% of the
+     stage width right and his face went BEHIND the CVC board
+     (board left edge 32.4%). At 16% he stops at right edge 29.7%,
+     fully visible head to shoes with a clean gap to the board. */
+  lc.style.transform="translateX(16%)";
+  seqTimers.push(setTimeout(function(){
+    lc.classList.remove("walk-bob");
+    if($("s-lesson").classList.contains("active") && !lessonOn) startLesson();
+  },1850));
+}
+function startLesson(){
+  if(lessonOn) return;
+  lessonOn=true;
+  $("btnTri").style.display="none";
+  $("hotLayer").style.display="block";
+  speak("Welcome to Kenya! Let's learn CVC words!");
+  var words=["cat","bus","mud","fan","pig","top"], t=2600;
+  words.forEach(function(w,i){
+    seqTimers.push(setTimeout(function(){ lightWord(w); speak(PHON[w]); }, t+i*2100));
+  });
+  seqTimers.push(setTimeout(function(){ lightWord(null); startPractice(); }, t+words.length*2100));
+}
+$("btnTri").addEventListener("click",startLesson);
+$("kiSkip").addEventListener("click",function(){ stopVoice(); endKenyaIntro(); });
+$("kiGo").addEventListener("click",function(){ stopVoice(); endKenyaIntro(); });
+/* ---- PDF §6 practice: select the right word, with IMMEDIATE
+   feedback — correct lights the word green with praise, wrong
+   shakes it and repeats the target. When every word is found,
+   the Play button pulses: the lesson is complete. ---- */
+var practice=null;
+function startPractice(){
+  if(!$("s-lesson").classList.contains("active")) return;
+  var order=["cat","bus","mud","fan","pig","top"].sort(function(){ return Math.random()-.5; });
+  practice={list:order,idx:0};
+  askPractice();
+}
+function askPractice(){
+  if(!practice) return;
+  var w=practice.list[practice.idx];
+  toast("Tap the word: "+w+"!");
+  speak("Now you try! Tap the word: "+w+"!");
+}
+document.querySelectorAll(".hot").forEach(function(h){
+  h.addEventListener("click",function(){
+    if(!lessonOn) return;
+    var w=h.getAttribute("data-word");
+    if(practice && practice.idx<practice.list.length){
+      var target=practice.list[practice.idx];
+      if(w===target){
+        h.classList.add("done"); lightWord(w);
+        speak("Yes! "+PHON[w]);
+        practice.idx++;
+        if(practice.idx>=practice.list.length){
+          practice=null;
+          seqTimers.push(setTimeout(function(){
+            lightWord(null);
+            toast("You did it! Now tap Play to start Level 1!");
+            speak("You did it! Now tap Play to start the game!");
+            $("btnLessonPlay").classList.add("pulse");
+          },1400));
+        } else {
+          seqTimers.push(setTimeout(function(){ lightWord(null); askPractice(); },1500));
+        }
+      } else {
+        h.classList.remove("wrong"); void h.offsetWidth; h.classList.add("wrong");
+        speak("Try again! Find the word: "+target+"!");
+        toast("Try again! Find: "+target);
+      }
+      return;
+    }
+    lightWord(w); speak(PHON[w]);
+  });
+});
+$("btnLessonPlay").addEventListener("click",function(){
+  if(!lessonOn){ toast("Tap the big green play button on the board first!"); speak("Tap the big green play button first!"); return; }
+  /* Play = leave the lesson: kill the CVC reading completely (current
+     line + every queued word timer) BEFORE the game opens, then start
+     the game's own line on the game screen. */
+  stopVoice();
+  go("s-game");
+  speak("Let's play! Collect the stars!");
+});
+/* ================= 6. GAME ================= */
+var GW=2732, GH=1024; /* world units = bg-game native size */
+/* Platform surfaces MEASURED on the buyer's game-platforms.webp
+   (2732x1208, rendered stretched to the 2732x1024 world, so a native
+   y maps to world y = native/1208*1024). Each y below is the TOP OF
+   THE GRASS strip — the visible surface the feet must rest on.
+   The old values sat 20-50 units BELOW the grass (under the dirt
+   top), which is why the character sank into the ground with only
+   its top half above the surface. x/w are the islands' real extents
+   in the artwork (the old upper platforms were also shifted sideways
+   into empty air beside the islands they were meant to match). */
+var PLATS=[
+  {x:0,y:766,w:915},{x:915,y:766,w:795},{x:1710,y:766,w:330},{x:2420,y:766,w:312},
+  {x:550,y:161,w:600},{x:655,y:512,w:445},{x:1190,y:341,w:295},
+  {x:1565,y:382,w:550},{x:1990,y:497,w:225},{x:2185,y:636,w:185},{x:2333,y:341,w:292},
+  /* PDF §7 "go down": between the ground at x 2040 and the ground
+     at x 2420 the path DROPS into a lower valley — a floor at
+     y 940 with a step at y 850 to climb back out. The camera
+     follows the character down (see camY in render()). */
+  {x:2010,y:940,w:440},{x:2280,y:850,w:120}
+];
+/* The bamboo ladder in the artwork: rails span world x 1641..1763,
+   from the ground grass (766) up to the cliff-top grass (382). The
+   old collision box sat at x 2118 — inside the cliff steps, ~400
+   units right of the ladder the player can see — so standing at the
+   real ladder and pressing Up could never trigger a climb. */
+var LADDER={x:1648,w:108,top:382,bottom:766};
+var PH=110; /* character height in world units — feet are at y+PH */
+/* Level totals — MUST match the spots in buildPicks() below: 15 stars
+   and 5 orbs/gems are placed in the level. The Skill Check is gated on
+   these totals (see the pickup + finish logic in step()). */
+var TOTAL_STARS=15, TOTAL_ORBS=5;
+function allCollected(){ return S.stars>=TOTAL_STARS && S.orbs>=TOTAL_ORBS; }
+function updateCounters(){
+  $("starNum").textContent=S.stars+"/"+TOTAL_STARS;
+  $("orbNum").textContent=S.orbs+"/"+TOTAL_ORBS;
+}
+function remainingText(){
+  var rs=TOTAL_STARS-S.stars, ro=TOTAL_ORBS-S.orbs, parts=[];
+  if(rs>0) parts.push(rs+(rs===1?" star":" stars"));
+  if(ro>0) parts.push(ro+(ro===1?" gem":" gems"));
+  return parts.join(" and ");
+}
+var PICKS=[];
+function buildPicks(){
+  var defs=[];
+  var starSpots=[[300,730],[560,730],[1080,730],[1420,730],[1830,730],[2230,872],[1000,454],[1250,454],[800,96],[1150,96],[1620,290],[2050,320],[2280,320],[2520,290],[900,730]];
+  var orbSpots=[[1000,60],[1700,268],[2180,298],[2540,268],[1900,690]];
+  starSpots.forEach(function(p){ defs.push({t:"star",x:p[0],y:p[1]}); });
+  orbSpots.forEach(function(p){ defs.push({t:"orb",x:p[0],y:p[1]}); });
+  /* PDF §7: the phonics skill inside the game — letter stars along
+     the path. Collecting one says its letter sound out loud. They
+     are a bonus: the level totals stay 15 stars + 5 gems. */
+  var letterSpots=[["c",420,690],["a",1330,690],["t",1760,300],["b",950,420],["s",2560,690]];
+  letterSpots.forEach(function(p){ defs.push({t:"letter",L:p[0],x:p[1],y:p[2]}); });
+  var layer=$("pickLayer"); layer.innerHTML=""; PICKS=[];
+  defs.forEach(function(d){
+    var el=document.createElement("div"); el.className="pick";
+    var sz=d.t==="star"?64:74;
+    el.style.cssText="left:"+(d.x/GW*100)+"%;top:"+(d.y/GH*100)+"%;width:"+(sz/GW*100)+"%";
+    el.innerHTML='<img class="gl" src="assets/glow.png" alt=""><img class="it" src="assets/'+(d.t==="orb"?"orb.png":"star.png")+'" alt="">'+(d.t==="letter"?'<span class="lt">'+d.L+'</span>':"");
+    layer.appendChild(el);
+    PICKS.push({t:d.t,L:d.L||"",x:d.x+sz/2,y:d.y+sz/2,el:el,got:false});
+  });
+}
+var G=null, rafId=null;
+function startGame(){
+  buildPicks();
+  S.stars=0; S.orbs=0; updateCounters();
+  G={x:120,y:640,vx:0,vy:0,face:1,onGround:false,climb:false,over:false,keys:{},last:0,cam:0,lastFinishHint:0};
+  $("pauseWrap").classList.remove("on"); $("scWrap").classList.remove("on");
+  cancelAnimationFrame(rafId);
+  G.last=performance.now();
+  rafId=requestAnimationFrame(tick);
+}
+function stopGame(){ if(rafId) cancelAnimationFrame(rafId); rafId=null; }
+function stageW(){ return $("s-game").clientWidth; }
+function tick(now){
+  if(!G) return;
+  var dt=Math.min(.033,(now-G.last)/1000); G.last=now;
+  if(!G.over && !$("pauseWrap").classList.contains("on") && !$("scWrap").classList.contains("on")) step(dt);
+  render();
+  rafId=requestAnimationFrame(tick);
+}
+function step(dt){
+  var SPEED=520, CLIMB=300, p=G;
+  var feet=p.y+PH, cx=p.x+46;
+  var overLadder = cx>LADDER.x && cx<LADDER.x+LADDER.w;
+  /* ---- enter the ladder ----
+     From the ground at its foot (Up), from the cliff top at its head
+     (Down), or by grabbing it mid-jump with Up/Down. Entering snaps
+     the character onto the ladder's centre line, exactly over the
+     bamboo rails drawn in the artwork. */
+  if(!p.climb && overLadder){
+    var atBottom = p.onGround && Math.abs(feet-LADDER.bottom)<=10;
+    var atTop = p.onGround && Math.abs(feet-LADDER.top)<=10;
+    var midGrab = feet>LADDER.top+12 && feet<LADDER.bottom-4 && (p.keys.up||p.keys.down);
+    if((atBottom && p.keys.up)||(atTop && p.keys.down)||midGrab){
+      p.climb=true; p.vy=0; p.vx=0;
+      p.x=LADDER.x+LADDER.w/2-46;
+    }
+  }
+  if(p.climb){
+    /* ---- climbing: no gravity, no jump needed ----
+       Up/Down move the character rung by rung between the ground
+       grass and the cliff-top grass; it stays centred on the rails. */
+    p.vx=0; p.vy=0;
+    if(p.keys.up) p.y-=CLIMB*dt;
+    if(p.keys.down) p.y+=CLIMB*dt;
+    feet=p.y+PH;
+    /* Step off sideways once level with a surface. */
+    if((p.keys.left||p.keys.right) && (Math.abs(feet-LADDER.top)<=26 || Math.abs(feet-LADDER.bottom)<=26)){
+      p.climb=false;
+    }
+    if(feet<=LADDER.top){ p.y=LADDER.top-PH; p.climb=false; p.onGround=true; }
+    else if(feet>=LADDER.bottom){ p.y=LADDER.bottom-PH; p.climb=false; p.onGround=true; }
+    if(p.keys.jump && p.climb){ p.climb=false; p.vy=-760; }
+  } else {
+    p.vx=0;
+    if(p.keys.left){ p.vx=-SPEED; p.face=-1; }
+    if(p.keys.right){ p.vx=SPEED; p.face=1; }
+    p.vy+=2500*dt; if(p.vy>1500)p.vy=1500;
+    if(p.keys.jump && p.onGround){ p.vy=-1240; p.onGround=false; }
+  }
+  var prevBottom=p.y+PH;
+  p.x+=p.vx*dt; p.y+=p.vy*dt;
+  if(p.x<0)p.x=0; if(p.x>GW-92)p.x=GW-92;
+  p.onGround=false;
+  if(!p.climb){
+    /* Land on the HIGHEST surface crossed this frame: the feet stop
+       exactly on that platform's grass top (y = top - PH) and can
+       never tunnel past it or sink below it. */
+    var best=null;
+    for(var i=0;i<PLATS.length;i++){
+      var pl=PLATS[i];
+      if(p.x+70>pl.x && p.x+22<pl.x+pl.w){
+        if(prevBottom<=pl.y+2 && p.y+PH>=pl.y && p.vy>=0){
+          if(best===null||pl.y<best) best=pl.y;
+        }
+      }
+    }
+    if(best!==null){ p.y=best-PH; p.vy=0; p.onGround=true; }
+  }
+  if(p.y>GH+60){ p.x=120; p.y=640; p.vy=0; toast("Splash! Try again!"); }
+  /* pickups */
+  var cx=p.x+46, cy=p.y+55;
+  PICKS.forEach(function(pk){
+    if(pk.got) return;
+    var dx=pk.x-cx, dy=pk.y-cy;
+    if(dx*dx+dy*dy<95*95){
+      pk.got=true; pk.el.classList.add("got");
+      /* Collecting ONE star or ONE orb ONLY bumps its counter
+         (shown as collected/total, e.g. 3/15) — it must NEVER end
+         the level or open the Skill Check on its own. */
+      if(pk.t==="star"){ S.stars++; }
+      else if(pk.t==="orb"){ S.orbs++; }
+      else if(pk.t==="letter"){
+        /* Phonics in the game: say the letter and its sound. */
+        var LS={c:"kuh",a:"a",t:"tuh",b:"buh",s:"sss"};
+        toast("Letter "+pk.L.toUpperCase()+" says "+(LS[pk.L]||"")+"!");
+        speak("Letter "+pk.L+"! "+(LS[pk.L]||"")+"!");
+      }
+      updateCounters();
+      /* The level is finished only when EVERY star and EVERY orb
+         in the level has been collected. */
+      if(allCollected()){ finishGame(); }
+    }
+  });
+  /* Finish point: the far top platform. Standing on it does NOT end
+     the level by itself — that was the bug: that platform holds a
+     star near the top corner, so collecting that first star ended
+     the game and opened the Skill Check while stars and gems on the
+     sides and above were still uncollected. Now the finish point
+     only completes the level once all 15 stars and all 5 orbs are
+     collected; before that it just tells the player what is left. */
+  if(p.x>2330 && p.y+110<=410){
+    if(allCollected()){ finishGame(); }
+    else {
+      var nowMs=performance.now();
+      if(!p.lastFinishHint || nowMs-p.lastFinishHint>4000){
+        p.lastFinishHint=nowMs;
+        var rem=remainingText();
+        toast("Almost there! Collect "+rem+" first!");
+        speak("Almost there! Collect "+rem+" first!");
+      }
+    }
+  }
+}
+function render(){
+  if(!G) return;
+  var sw=stageW(), worldW=$("world").offsetWidth||sw*2, scaleX=worldW/GW;
+  var cam=Math.max(0,Math.min(GW*scaleX-sw, (G.x+46)*scaleX-sw/2));
+  G.cam=cam;
+  /* PDF §7 "the screen moves down as well": when the character
+     climbs down the ladder into the lower valley, the whole world
+     follows him down (and back up again) — a vertical camera in
+     world units, clamped so the shift stays gentle. The game
+     view's own sky-to-grass gradient fills the strip the shift
+     uncovers, so no edge or bar ever shows. */
+  var worldH=$("world").offsetHeight||sw*0.75, scaleY=worldH/GH;
+  var camY=Math.max(0,Math.min(185,(G.y+PH)-725))*scaleY;
+  $("world").style.transform="translate("+(-cam)+"px,"+(-camY)+"px)";
+  var pl=$("player");
+  pl.style.left=(G.x/GW*100)+"%"; pl.style.top=(G.y/GH*100)+"%";
+  pl.style.transform="scaleX("+G.face+")";
+  /* The chosen Adventure item rides on the game character's chest. */
+  var abg=$("advBadgeGame");
+  if(abg&&S.adv){ abg.style.left=((G.x+72)/GW*100)+"%"; abg.style.top=((G.y+48)/GH*100)+"%"; }
+}
+function finishGame(){
+  if(!G||G.over) return;
+  /* Hard gate: the Skill Check can NEVER open before every star
+     (15) and every orb/gem (5) in the level has been collected. */
+  if(!allCollected()) return;
+  G.over=true;
+  speak("Hooray! You finished! Time for a skill check!");
+  setTimeout(function(){ if($("s-game").classList.contains("active")) openSkill(); },900);
+}
+/* controls */
+function bindHold(id,key){
+  var el=$(id);
+  var on=function(e){ e.preventDefault(); if(G) G.keys[key]=true; el.classList.add("on"); };
+  var off=function(){ if(G) G.keys[key]=false; el.classList.remove("on"); };
+  el.addEventListener("pointerdown",on);
+  el.addEventListener("pointerup",off); el.addEventListener("pointerleave",off); el.addEventListener("pointercancel",off);
+}
+bindHold("tcLeft","left"); bindHold("tcRight","right"); bindHold("tcJump","jump");
+/* ---- Ladder climbing with NO extra on-screen controls ----
+   The buyer's game design has ONLY the left/right arrows and JUMP,
+   so nothing may be added on screen. The ladder in the artwork is
+   itself the control:
+   - Tap-and-hold directly ON the ladder: at its foot a hold climbs
+     up, at its head a hold climbs down; while climbing, holding the
+     part of the ladder above the character goes up, below goes down.
+   - Swipe up on the game screen while the character is at the
+     ladder: climbs to the top. Swipe down: climbs back to the
+     ground. One swipe holds the direction long enough (2.2 s > the
+     ~1.3 s a full climb takes) for step() to finish the climb and
+     step off by itself.
+   Keyboard Arrow Up / W and Arrow Down / S keep working as before. */
+var swipeTimer=null;
+function clearSwipe(){
+  if(swipeTimer){ clearTimeout(swipeTimer); swipeTimer=null; }
+}
+function swipeClimb(dir){
+  if(!G||G.over) return;
+  clearSwipe();
+  G.keys.up = (dir==="up"); G.keys.down = (dir==="down");
+  swipeTimer=setTimeout(function(){
+    swipeTimer=null;
+    if(G){ G.keys.up=false; G.keys.down=false; }
+  },2200);
+}
+function atLadder(){
+  if(!G) return false;
+  var cx=G.x+46, feet=G.y+PH;
+  return !!G.climb || (cx>LADDER.x-90 && cx<LADDER.x+LADDER.w+90 && feet>LADDER.top-20 && feet<LADDER.bottom+20);
+}
+(function(){
+  var view=$("gameView"), sx=0, sy=0, swiped=false, ladderHold=null;
+  function toWorld(e){
+    var r=view.getBoundingClientRect();
+    var worldW=$("world").offsetWidth||r.width*2;
+    return {
+      x:((e.clientX-r.left)+(G?G.cam:0))/(worldW/GW),
+      y:(e.clientY-r.top)/r.height*GH
+    };
+  }
+  view.addEventListener("pointerdown",function(e){
+    sx=e.clientX; sy=e.clientY; swiped=false; ladderHold=null;
+    if(!G||G.over||!atLadder()) return;
+    var w=toWorld(e);
+    var onLadder = w.x>LADDER.x-70 && w.x<LADDER.x+LADDER.w+70 && w.y>LADDER.top-50 && w.y<LADDER.bottom+50;
+    if(!onLadder) return;
+    var feet=G.y+PH;
+    if(!G.climb && Math.abs(feet-LADDER.bottom)<=14) ladderHold="up";
+    else if(!G.climb && Math.abs(feet-LADDER.top)<=14) ladderHold="down";
+    else ladderHold = (w.y<feet-10) ? "up" : "down";
+    clearSwipe();
+    G.keys.up = (ladderHold==="up"); G.keys.down = (ladderHold==="down");
+  });
+  view.addEventListener("pointermove",function(e){
+    if(!G||swiped) return;
+    var dy=e.clientY-sy, dx=e.clientX-sx;
+    if(Math.abs(dy)>48 && Math.abs(dy)>Math.abs(dx)*1.2){
+      swiped=true;
+      if(ladderHold){ G.keys[ladderHold]=false; ladderHold=null; }
+      if(atLadder()) swipeClimb(dy<0?"up":"down");
+    }
+  });
+  function endHold(){
+    if(ladderHold && G){ G.keys[ladderHold]=false; }
+    ladderHold=null;
+  }
+  view.addEventListener("pointerup",endHold);
+  view.addEventListener("pointercancel",endHold);
+  view.addEventListener("pointerleave",endHold);
+})();
+document.addEventListener("keydown",function(e){
+  if(!G) return;
+  if(e.key==="ArrowLeft")G.keys.left=true;
+  if(e.key==="ArrowRight")G.keys.right=true;
+  if(e.key==="ArrowUp"||e.key==="w"||e.key==="W"){ G.keys.up=true; e.preventDefault(); }
+  if(e.key==="ArrowDown"||e.key==="s"||e.key==="S"){ G.keys.down=true; e.preventDefault(); }
+  if(e.key===" "){ G.keys.jump=true; e.preventDefault(); }
+});
+document.addEventListener("keyup",function(e){
+  if(!G) return;
+  if(e.key==="ArrowLeft")G.keys.left=false;
+  if(e.key==="ArrowRight")G.keys.right=false;
+  if(e.key==="ArrowUp"||e.key==="w"||e.key==="W")G.keys.up=false;
+  if(e.key==="ArrowDown"||e.key==="s"||e.key==="S")G.keys.down=false;
+  if(e.key===" ")G.keys.jump=false;
+});
+$("btnPause").addEventListener("click",function(){ $("pauseWrap").classList.add("on"); });
+$("btnResume").addEventListener("click",function(){ $("pauseWrap").classList.remove("on"); });
+$("btnRestart").addEventListener("click",function(){ $("pauseWrap").classList.remove("on"); startGame(); });
+/* ================= SKILL CHECK ================= */
+var ROUNDS=[
+  {word:"bus",pic:"assets/cvc-bus.png",pat:"b _ s",ans:"u",baked:true},
+  {word:"cat",pic:"assets/cvc-cat.png",pat:"c _ t",ans:"a"},
+  {word:"pig",pic:"assets/cvc-pig.png",pat:"p _ g",ans:"i"},
+  {word:"top",pic:"assets/cvc-top.png",pat:"t _ p",ans:"o"},
+  {word:"mud",pic:"assets/cvc-mud.png",pat:"m _ d",ans:"u"}
+];
+var round=0, roundDone=false;
+function openSkill(){
+  round=0;
+  /* PDF §8: the skill check shows the stars and gems earned so far. */
+  $("scStars").textContent=S.stars+"/"+TOTAL_STARS;
+  $("scOrbs").textContent=S.orbs+"/"+TOTAL_ORBS;
+  $("scWrap").classList.add("on"); setRound();
+}
+function setRound(){
+  roundDone=false;
+  var r=ROUNDS[round];
+  if(r.baked){
+    $("scCellImg").src="assets/sc-bs.png"; $("scCellImg").style.display="block";
+    $("scWordTxt").style.display="none";
+    $("scPicCover").style.display="none"; $("scPic").style.display="none";
+  } else {
+    $("scCellImg").src="assets/sc-empty.png"; $("scCellImg").style.display="block";
+    var wt=$("scWordTxt"); wt.style.display="flex"; wt.textContent=r.pat;
+    $("scPicCover").style.display="block";
+    var pic=$("scPic"); pic.src=r.pic; pic.style.display="block";
+  }
+  document.querySelectorAll(".vowel").forEach(function(v){ v.style.opacity="1"; v.classList.remove("shake"); });
+  setTimeout(function(){ if($("scWrap").classList.contains("on")) speak("Skill check! What letter is missing? "+r.pat.replace("_","...")+" — "+r.word+"!"); },350);
+}
+document.querySelectorAll(".vowel").forEach(function(v){
+  v.addEventListener("click",function(){
+    if(roundDone) return;
+    var r=ROUNDS[round], pick=v.getAttribute("data-v");
+    if(pick===r.ans){
+      roundDone=true;
+      if(r.baked){ $("scCellImg").src="assets/sc-bus.png"; }
+      else { $("scWordTxt").textContent=r.word; }
+      speak("Yes! "+r.word+"! Great job!");
+      toast("Yes! "+r.word+"!");
+      setTimeout(function(){
+        round++;
+        if(round<ROUNDS.length) setRound();
+        else { $("scWrap").classList.remove("on"); showReward(); }
+      },1500);
+    } else {
+      v.classList.remove("shake"); void v.offsetWidth; v.classList.add("shake"); v.style.opacity=".45";
+      speak("Try again! Listen: "+r.word);
+    }
+  });
+});
+/* PDF §8: voice RECORDING — the mic first tries a real recording
+   (getUserMedia + MediaRecorder): the child says the word, hears
+   their OWN voice played back, and gets praised. Where recording
+   is not available or not allowed, it falls back to speech
+   recognition, and where that is missing too, to the spoken
+   prompt — the button always does something. */
+var recState=null;
+function stopRecording(){
+  if(recState){ try{ recState.rec.stop(); }catch(e){} if(recState.stream){ recState.stream.getTracks().forEach(function(t){ t.stop(); }); } recState=null; }
+  $("btnMic").classList.remove("mic-listen");
+}
+$("btnMic").addEventListener("click",function(){
+  var r=ROUNDS[round], btn=$("btnMic");
+  if(recState){ stopRecording(); return; }
+  btn.classList.add("mic-listen");
+  if(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder){
+    speak("Say it: "+r.word+"!");
+    navigator.mediaDevices.getUserMedia({audio:true}).then(function(stream){
+      var chunks=[], rec=new MediaRecorder(stream);
+      recState={rec:rec,stream:stream};
+      rec.ondataavailable=function(e){ if(e.data&&e.data.size) chunks.push(e.data); };
+      rec.onstop=function(){
+        stream.getTracks().forEach(function(t){ t.stop(); });
+        recState=null; btn.classList.remove("mic-listen");
+        if(chunks.length){
+          var url=URL.createObjectURL(new Blob(chunks,{type:chunks[0].type||"audio/webm"}));
+          var au=new Audio(url);
+          toast("That's your voice! Great speaking!");
+          au.onended=function(){ speak("That was you! Wonderful! Now tap the missing letter."); };
+          au.play().catch(function(){ speak("Great speaking! Now tap the missing letter."); });
+        }
+      };
+      rec.start();
+      toast("Recording… say: "+r.word+"!");
+      setTimeout(function(){ if(recState) stopRecording(); },3500);
+    }).catch(function(){ recState=null; micFallback(r,btn); });
+    return;
+  }
+  micFallback(r,btn);
+});
+function micFallback(r,btn){
+  var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(SR){
+    try{
+      var rec=new SR(); rec.lang="en-US"; rec.interimResults=false; rec.maxAlternatives=3;
+      rec.onresult=function(ev){
+        btn.classList.remove("mic-listen");
+        var said="";
+        for(var i=0;i<ev.results[0].length;i++) said+=ev.results[0][i].transcript.toLowerCase()+" ";
+        if(said.indexOf(r.word)>-1){ toast("You said "+r.word+"! Wonderful!"); speak("You said "+r.word+"! Wonderful!"); }
+        else { toast("I heard you! Now tap the missing letter."); speak("Good speaking! Now tap the missing letter."); }
+      };
+      rec.onerror=function(){ btn.classList.remove("mic-listen"); speak("Say it out loud: "+r.word+"!"); };
+      rec.onend=function(){ btn.classList.remove("mic-listen"); };
+      rec.start();
+      speak("Say it: "+r.word+"!");
+      return;
+    }catch(e){}
+  }
+  speak("Say it out loud: "+r.word+"!");
+  setTimeout(function(){ btn.classList.remove("mic-listen"); toast("Great speaking! Now tap the missing letter."); },1800);
+}
+/* ================= REWARD ================= */
+function showReward(){
+  $("finalStars").textContent=S.stars;
+  $("finalOrbs").textContent=S.orbs;
+  go("s-reward");
+  speak("You did it! Level one complete! You are a reading star!");
+  var layer=$("fallLayer"); layer.innerHTML="";
+  for(var i=0;i<22;i++){
+    var s=document.createElement("img");
+    s.src=i%4===0?"assets/orb.png":"assets/star.png";
+    s.className="fall";
+    s.style.left=(Math.random()*94)+"%";
+    s.style.width=(3+Math.random()*3.4)+"%";
+    s.style.animationDuration=(2.2+Math.random()*2.4)+"s";
+    s.style.animationDelay=(Math.random()*1.6)+"s";
+    layer.appendChild(s);
+  }
+  setTimeout(function(){ layer.innerHTML=""; },7000);
+}
+$("btnAgain").addEventListener("click",function(){ go("s-game"); });
+$("btnNext").addEventListener("click",function(){
+  toast("Level 2 is coming soon — you finished Level 1!");
+  speak("Level 2 is coming soon! You finished Level 1! Great job!");
+});
+resetLesson();
+</script>
+</body>
+</html>
